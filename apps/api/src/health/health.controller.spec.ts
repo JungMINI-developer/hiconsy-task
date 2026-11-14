@@ -15,6 +15,6 @@ describe('HealthController', () => {
     }).compile();
 
     const result = await moduleRef.get(HealthController).check();
-    expect(result.data.database).toBe('up');
+    expect(result.database).toBe('up');
   });
 });
