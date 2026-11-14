@@ -103,7 +103,7 @@ pnpm typecheck   # 타입 체크
 
 ```
 apps/
-  web/              # Vue 3 SPA
+  web/              # Vue 3 SPA (+ docs/ UI/UX 설계 문서)
   api/              # NestJS REST API (+ prisma/ 스키마·마이그레이션)
 packages/
   shared/           # FE/BE 공유 타입 (API 요청/응답 계약)
@@ -114,6 +114,7 @@ docs/               # 상세 문서
 
 - 아키텍처 (인프라, 소스 코드 구조, 요청 흐름): [docs/architecture.md](./docs/architecture.md)
 - 컨벤션 (브랜치 전략, 커밋, 코드 스타일): [CONTRIBUTING.md](./CONTRIBUTING.md)
+- UI/UX 설계 (사용자 흐름, 화면 명세, 디자인 시스템, UI 구현 방식): [apps/web/docs](./apps/web/docs/README.md)
 
 ---
 

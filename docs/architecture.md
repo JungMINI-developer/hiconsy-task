@@ -58,4 +58,6 @@ src/
   router/
 ```
 
+UI는 Reka UI(헤드리스) + 자체 CSS 변수 토큰으로 구현합니다. 화면 구성, 라우트 맵, 컴포넌트 구조는 [apps/web/docs](../apps/web/docs/README.md)를 참고합니다.
+
 > TODO: 도메인 구현 후 모듈/컴포넌트 구조 보완
