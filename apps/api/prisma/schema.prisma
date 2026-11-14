@@ -1,11 +1,113 @@
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "esm"
-  // 생성 환경(tsconfig 유무)에 따라 추론이 달라지지 않도록 ESM 런타임용 .js 확장자를 명시
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
   importFileExtension = "js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+/// 방문 신청 상태. 취소 건은 정원 계산에서 제외된다.
+enum VisitStatus {
+  APPLIED
+  CANCELED
+}
+
+/// 이력 이벤트 종류
+enum VisitAction {
+  APPLY
+  UPDATE
+  CANCEL
+}
+
+/// 이력을 남긴 주체. SYSTEM은 자습실 변경·삭제로 인한 자동 처리(FR-ROM-06) 용도
+enum ActorType {
+  STUDENT
+  INSTRUCTOR
+  SYSTEM
+}
+
+/// 학생
+model Student {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(50)
+  phone     String    @db.VarChar(20)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  visits    Visit[]
+  histories VisitHistory[]
+
+  @@index([deletedAt])
+  @@map("students")
+}
+
+/// 자습실
+model StudyRoom {
+  id           Int       @id @default(autoincrement())
+  name         String    @db.VarChar(100)
+  maxPersonnel Int       @map("max_personnel")
+  startDate    DateTime  @map("start_date") @db.Timestamptz(3)
+  endDate      DateTime  @map("end_date") @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  visits    Visit[]
+  histories VisitHistory[]
+
+  @@index([deletedAt, startDate])
+  @@map("study_rooms")
+}
+
+/// 방문 신청 (현재 상태). 학생-자습실 쌍당 1행이며, 취소 후 재신청 시 같은 행을 APPLIED로 되돌린다.
+model Visit {
+  id          Int         @id @default(autoincrement())
+  studentId   Int         @map("student_id")
+  studyRoomId Int         @map("study_room_id")
+  startAt     DateTime    @map("start_at") @db.Timestamptz(3)
+  endAt       DateTime    @map("end_at") @db.Timestamptz(3)
+  status      VisitStatus @default(APPLIED)
+  canceledAt  DateTime?   @map("canceled_at") @db.Timestamptz(3)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  student   Student        @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  studyRoom StudyRoom      @relation(fields: [studyRoomId], references: [id], onDelete: Restrict)
+  histories VisitHistory[]
+
+  @@unique([studentId, studyRoomId])
+  @@index([studyRoomId, status])
+  @@map("visits")
+}
+
+/// 방문 신청 이력 (append-only). 신청·수정·취소마다 1행씩 쌓이며 수정·삭제하지 않는다.
+model VisitHistory {
+  id          Int         @id @default(autoincrement())
+  visitId     Int         @map("visit_id")
+  /// 자습실별·학생별 이력 조회를 조인 없이 하기 위해 비정규화
+  studyRoomId Int         @map("study_room_id")
+  studentId   Int         @map("student_id")
+  action      VisitAction
+  /// 이벤트 이전 방문 구간 (APPLY는 null)
+  prevStartAt DateTime?   @map("prev_start_at") @db.Timestamptz(3)
+  prevEndAt   DateTime?   @map("prev_end_at") @db.Timestamptz(3)
+  /// 이벤트 이후 방문 구간
+  startAt     DateTime    @map("start_at") @db.Timestamptz(3)
+  endAt       DateTime    @map("end_at") @db.Timestamptz(3)
+  actorType   ActorType   @default(STUDENT) @map("actor_type")
+  reason      String?     @db.VarChar(255)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  visit     Visit     @relation(fields: [visitId], references: [id], onDelete: Restrict)
+  studyRoom StudyRoom @relation(fields: [studyRoomId], references: [id], onDelete: Restrict)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@index([studyRoomId, createdAt])
+  @@index([studentId, createdAt])
+  @@index([visitId])
+  @@map("visit_histories")
 }
