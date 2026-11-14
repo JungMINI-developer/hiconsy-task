@@ -6,6 +6,7 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor.
 import { validateEnv } from './config/env.validation.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { StudentsModule } from './students/students.module.js';
 import { StudyRoomsModule } from './study-rooms/study-rooms.module.js';
 
 @Module({
@@ -13,6 +14,7 @@ import { StudyRoomsModule } from './study-rooms/study-rooms.module.js';
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     PrismaModule,
     StudyRoomsModule,
+    StudentsModule,
   ],
   controllers: [HealthController],
   providers: [
