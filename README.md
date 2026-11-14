@@ -63,6 +63,10 @@ turbo.json
 pnpm-workspace.yaml
 ```
 
+## 컨벤션
+
+브랜치 전략(Git Flow), 커밋/코드 컨벤션은 [CONTRIBUTING.md](./CONTRIBUTING.md)를 참고하세요.
+
 ## 개발 시 참고
 
 - FE는 Vite dev proxy로 `/api` 요청을 `localhost:3000`에 보냅니다. 그래서 개발 중에는 CORS 설정 없이 호출할 수 있습니다.

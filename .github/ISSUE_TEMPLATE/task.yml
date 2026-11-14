@@ -1,0 +1,17 @@
+name: 🔧 작업
+description: 리팩토링, 설정, 문서 등 기능/버그 외 작업
+title: '[Chore] '
+labels: ['chore']
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 작업 내용
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: 작업 목록
+      value: |
+        - [ ]
