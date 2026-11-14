@@ -2,17 +2,34 @@
 
 ## 라이브러리 선택
 
-| 선택                                      | 이유                                                                                                                                       |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Reka UI** (`reka-ui@2`, 헤드리스)       | 다이얼로그 포커스 트랩, Select 키보드 탐색, DatePicker 등 접근성 구현이 까다로운 부분만 맡긴다. 스타일이 없어 디자인을 직접 통제할 수 있다 |
-| **자체 CSS 변수 토큰** + `<style scoped>` | 의존성을 늘리지 않고, 토큰 한 곳만 바꾸면 전체가 따라온다. Tailwind 없이도 화면 수(8개)가 적어 관리 가능                                   |
-| `@internationalized/date`                 | Reka UI 날짜 컴포넌트가 요구하는 날짜 타입. 시간대 변환을 이 계층에서만 처리                                                               |
-| `pretendard`                              | 한글 UI 서체 (npm으로 받아 self-host)                                                                                                      |
+| 선택                                                   | 이유                                                                                                                                                                                                                  |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Reka UI** (`reka-ui@2`, 헤드리스)                    | 다이얼로그 포커스 트랩, Select 키보드 탐색, DatePicker 등 접근성 구현이 까다로운 부분만 맡긴다. 스타일이 없어 디자인을 직접 통제할 수 있다                                                                            |
+| **Tailwind CSS v4** (`@tailwindcss/vite`)              | 템플릿 안에서 스타일을 끝내 파일·클래스 이름 고민이 없다. `@theme`에 정한 토큰만 클래스로 나오므로 하드코딩 값이 자연스럽게 줄어든다. Reka UI의 `data-state` 속성에 `data-[state=open]:`으로 바로 스타일을 걸 수 있다 |
+| `class-variance-authority` + `tailwind-merge` + `clsx` | 버튼·배지처럼 변형이 많은 컴포넌트의 클래스를 `cva`로 정리하고, `cn()`으로 외부에서 넘긴 클래스와 충돌 없이 합친다                                                                                                    |
+| `@internationalized/date`                              | Reka UI 날짜 컴포넌트가 요구하는 날짜 타입. 시간대 변환을 이 계층에서만 처리                                                                                                                                          |
+| `pretendard`                                           | 한글 UI 서체 (npm으로 받아 self-host)                                                                                                                                                                                 |
+| `prettier-plugin-tailwindcss` (dev)                    | 클래스 순서를 자동 정렬해 리뷰 diff를 줄인다                                                                                                                                                                          |
 
-쓰지 않는 것: Tailwind, shadcn-vue, Vuetify/Element Plus(완성형 라이브러리는 기본 테마 인상이 강하고 번들이 큼), 전역 서버 캐시 라이브러리(재조회 전략으로 충분).
+쓰지 않는 것: shadcn-vue(같은 Reka UI + Tailwind 조합이지만 완성 컴포넌트를 받아오면 기본 테마 인상이 남는다. 구현 참고 자료로만 본다), Vuetify/Element Plus(완성형 라이브러리는 기본 테마 인상이 강하고 번들이 큼), 전역 서버 캐시 라이브러리(재조회 전략으로 충분).
 
 ```bash
-pnpm --filter @hiconsy/web add reka-ui @internationalized/date pretendard
+pnpm --filter @hiconsy/web add reka-ui @internationalized/date pretendard class-variance-authority tailwind-merge clsx
+pnpm --filter @hiconsy/web add -D tailwindcss @tailwindcss/vite prettier-plugin-tailwindcss
+```
+
+```ts
+// apps/web/vite.config.ts
+import tailwindcss from '@tailwindcss/vite';
+// plugins: [vue(), tailwindcss(), ...]
+```
+
+```jsonc
+// .prettierrc — 루트 설정에 플러그인 추가
+{
+  "plugins": ["prettier-plugin-tailwindcss"],
+  "tailwindStylesheet": "./apps/web/src/styles/main.css",
+}
 ```
 
 ## 폴더 구조
@@ -20,8 +37,7 @@ pnpm --filter @hiconsy/web add reka-ui @internationalized/date pretendard
 ```
 src/
   styles/
-    tokens.css        # design-system.md의 토큰 (CSS 변수)
-    base.css          # reset, 서체, :focus-visible, reduced-motion
+    main.css          # @import 'tailwindcss' + @theme 토큰 + @layer base (main.ts에서 import)
   components/
     ui/               # 범용 컴포넌트 (Reka UI 래핑 포함) — 도메인 import 금지
     domain/           # StudyRoomCard, CapacityBar, HistoryTimeline ...
@@ -41,6 +57,7 @@ src/
     client.ts         # axios 인스턴스 + 에러 정규화 인터셉터
     studyRooms.ts  visits.ts  students.ts
   utils/
+    cn.ts             # clsx + tailwind-merge
     datetime.ts       # 포맷(ux-writing 규칙), ISO ↔ CalendarDateTime 변환
     validation.ts     # 폼 검증 규칙 (BE와 같은 규칙)
 ```
@@ -53,8 +70,36 @@ src/
 
 - `<script setup lang="ts">`, props/emits는 타입 기반 선언(`defineProps<...>()`).
 - Reka UI는 `components/ui`에서만 import하고 래핑합니다. 화면 코드가 Reka UI에 직접 의존하지 않게 해서, 라이브러리를 바꿔도 `ui/`만 고치면 되도록 합니다.
-- 스타일은 `<style scoped>` + 토큰 변수. 색·간격 리터럴 금지(리뷰 시 `impeccable detect`로 확인).
 - 상태 5종(loading/empty/error/disabled/success)은 `Skeleton`, `EmptyState`, `ErrorState`와 `useAsync`의 `status`로 통일합니다.
+
+### Tailwind 사용 규칙
+
+- **스타일은 템플릿 클래스로 씁니다.** `<style scoped>`는 Tailwind로 표현이 안 되는 경우(복잡한 `@keyframes` 등)에만 쓰고, 그때는 블록 첫 줄에 `@reference "@/styles/main.css";`를 넣어야 `@apply`와 토큰을 쓸 수 있습니다.
+- **임의 값 금지.** `bg-[#3a5f8c]`, `p-[13px]`, `text-[15px]` 대신 `@theme` 토큰을 씁니다. 필요한 값이 없으면 토큰을 추가하고 `design-system.md`도 고칩니다. 기본 팔레트를 지웠으므로 `bg-blue-500` 같은 클래스는 아예 만들어지지 않습니다.
+- **클래스 이름을 문자열로 조합하지 않습니다.** `` `bg-status-${tone}` ``는 Tailwind가 찾지 못해 CSS가 생성되지 않습니다. 매핑 객체나 `cva` variant로 완성된 클래스 이름을 씁니다.
+- **변형이 있는 컴포넌트는 `cva`로 정의합니다.**
+
+  ```ts
+  // components/ui/button.variants.ts
+  export const buttonVariants = cva(
+    'inline-flex items-center justify-center gap-2 rounded-md px-4 h-10 text-label transition-colors duration-120 ease-standard disabled:opacity-50',
+    {
+      variants: {
+        variant: {
+          primary: 'bg-accent text-accent-fg hover:bg-accent/90',
+          secondary: 'border border-line bg-surface text-fg hover:bg-canvas',
+          ghost: 'text-fg hover:bg-canvas',
+          danger: 'bg-status-danger text-white hover:bg-status-danger/90',
+        },
+      },
+      defaultVariants: { variant: 'primary' },
+    },
+  );
+  ```
+
+- **외부 클래스는 `cn()`으로 합칩니다.** `ui` 컴포넌트는 `class` prop을 받아 `cn(buttonVariants({ variant }), props.class)`로 합쳐, 사용하는 쪽에서 덮어쓴 클래스가 이기게 합니다.
+- **Reka UI 상태는 data 속성으로 스타일링합니다.** `data-[state=open]:`, `data-[highlighted]:`, `data-[disabled]:` 수식어를 씁니다(별도 상태 클래스 토글 불필요).
+- **클래스가 너무 길어지면 컴포넌트로 뽑습니다.** 같은 클래스 묶음이 두 곳 이상 반복되면 `@apply`로 감추기보다 `ui`/`domain` 컴포넌트로 만듭니다.
 
 ### 데이터·에러
 
@@ -84,7 +129,7 @@ src/
 
 ## 구현 순서 (이슈 단위)
 
-1. **기반:** 의존성 설치, `tokens.css`/`base.css`, `components/ui` 기본 세트, 레이아웃, 라우터·세션 스토어 (S-00)
+1. **기반:** 의존성 설치, Tailwind 설정과 `main.css`(`@theme` 토큰), `components/ui` 기본 세트, 레이아웃, 라우터·세션 스토어 (S-00)
 2. **강사 MVP:** S-10, S-12, S-11, S-13
 3. **학생 MVP:** S-20, S-22, S-21
 4. **다듬기:** 빈/에러 상태 점검(`impeccable harden`, `onboard`), `unslop`, `impeccable polish`, 접근성 검토

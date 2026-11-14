@@ -26,18 +26,18 @@
 
 ## 디자인 → 구현 → 리뷰 워크플로
 
-GitHub에 스타 등록한 UI 관련 오픈소스는 컴포넌트 라이브러리가 아니라 **코딩 에이전트용 디자인 스킬**입니다. 그래서 컴포넌트는 [Reka UI](https://reka-ui.com)(헤드리스) + 자체 CSS 토큰으로 만들고, 스킬은 각 단계의 설계·검토 도구로 씁니다.
+GitHub에 스타 등록한 UI 관련 오픈소스는 컴포넌트 라이브러리가 아니라 **코딩 에이전트용 디자인 스킬**입니다. 그래서 컴포넌트는 [Reka UI](https://reka-ui.com)(헤드리스) + [Tailwind CSS v4](https://tailwindcss.com)(토큰은 `@theme`)로 만들고, 스킬은 각 단계의 설계·검토 도구로 씁니다.
 
-| 단계           | 할 일                                   | 사용할 스킬                                                                           | 산출물                                   |
-| -------------- | --------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------- |
-| 1. 제품 맥락   | 사용자·목표·제약 정리                   | `impeccable init`                                                                     | `apps/web/PRODUCT.md`                    |
-| 2. UX 설계     | 흐름·화면·상태를 코드 전에 확정         | `impeccable shape`                                                                    | 1~4번 문서                               |
-| 3. 시각 방향   | 톤·타이포·팔레트 결정                   | `frontend-design`, `better-colors`, `better-typography`                               | [design-system.md](./design-system.md)   |
-| 4. 기반 구현   | 토큰 CSS, `components/ui` 기본 컴포넌트 | `better-ui`, `state-machine`(컴포넌트 상태 전수 확인)                                 | `src/styles/tokens.css`, `components/ui` |
-| 5. 화면 구현   | 화면 단위 이슈로 구현                   | `better-layout`, `better-writing`, `impeccable harden`(에러·엣지), `onboard`(빈 상태) | `views/*`                                |
-| 6. 다듬기      | AI 티 제거, 완성도 패스                 | `unslop`, `impeccable polish`                                                         | -                                        |
-| 7. 검토        | UX 점수·기술 품질·접근성                | `impeccable critique` / `audit`, `better-accessibility`, `interface-review`(PR)       | PR 본문에 결과 요약                      |
-| 8. 디자인 기록 | 실제 구현된 시각 시스템 기록            | `impeccable document`                                                                 | `apps/web/DESIGN.md`                     |
+| 단계           | 할 일                                                 | 사용할 스킬                                                                           | 산출물                                 |
+| -------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------- |
+| 1. 제품 맥락   | 사용자·목표·제약 정리                                 | `impeccable init`                                                                     | `apps/web/PRODUCT.md`                  |
+| 2. UX 설계     | 흐름·화면·상태를 코드 전에 확정                       | `impeccable shape`                                                                    | 1~4번 문서                             |
+| 3. 시각 방향   | 톤·타이포·팔레트 결정                                 | `frontend-design`, `better-colors`, `better-typography`                               | [design-system.md](./design-system.md) |
+| 4. 기반 구현   | Tailwind `@theme` 토큰, `components/ui` 기본 컴포넌트 | `better-ui`, `state-machine`(컴포넌트 상태 전수 확인)                                 | `src/styles/main.css`, `components/ui` |
+| 5. 화면 구현   | 화면 단위 이슈로 구현                                 | `better-layout`, `better-writing`, `impeccable harden`(에러·엣지), `onboard`(빈 상태) | `views/*`                              |
+| 6. 다듬기      | AI 티 제거, 완성도 패스                               | `unslop`, `impeccable polish`                                                         | -                                      |
+| 7. 검토        | UX 점수·기술 품질·접근성                              | `impeccable critique` / `audit`, `better-accessibility`, `interface-review`(PR)       | PR 본문에 결과 요약                    |
+| 8. 디자인 기록 | 실제 구현된 시각 시스템 기록                          | `impeccable document`                                                                 | `apps/web/DESIGN.md`                   |
 
 | 스킬 출처                                                                   | 성격                                                                                         |
 | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
