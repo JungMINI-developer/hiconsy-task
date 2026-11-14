@@ -12,10 +12,14 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
-    "db:up": "docker compose up -d",
+    "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "db:migrate": "pnpm --filter @hiconsy/api prisma:migrate",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:e2e": "turbo run test:e2e",
+    "db:seed": "pnpm --filter @hiconsy/api prisma:seed",
+    "docker:up": "docker compose up --build -d",
+    "docker:down": "docker compose down"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",

@@ -1,3 +1,5 @@
+# 전체 실행:  docker compose up --build   → web http://localhost:8080, api http://localhost:3000/api
+# DB만 실행:  docker compose up -d postgres (pnpm db:up) → 로컬 개발(pnpm dev)용
 services:
   postgres:
     image: postgres:16-alpine
@@ -11,11 +13,37 @@ services:
       - '${POSTGRES_PORT:-5434}:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U hiconsy -d hiconsy']
       interval: 5s
       timeout: 5s
       retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: hiconsy-api
+    environment:
+      DATABASE_URL: postgresql://hiconsy:hiconsy@postgres:5432/hiconsy?schema=public
+      PORT: 3000
+      CORS_ORIGIN: http://localhost:8080
+    ports:
+      - '${API_PORT:-3000}:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: hiconsy-web
+    ports:
+      - '${WEB_PORT:-8080}:80'
+    depends_on:
+      - api
 
 volumes:
   postgres-data:
