@@ -104,4 +104,6 @@ src/
   router/
 ```
 
+UI는 Reka UI(헤드리스) + Tailwind CSS v4로 구현하고, 디자인 토큰은 `@theme`에 정의합니다. 화면 구성, 라우트 맵, 컴포넌트 구조는 [apps/web/docs](../apps/web/docs/README.md)를 참고합니다.
+
 > TODO: 도메인 구현 후 모듈/컴포넌트 구조 보완
