@@ -109,7 +109,18 @@ docs/               # 상세 문서
 
 ## 4. 데이터베이스 스키마
 
-스키마 구조(ERD)와 설계 이유: [docs/database.md](./docs/database.md)
+| 테이블            | 역할                                         |
+| ----------------- | -------------------------------------------- |
+| `students`        | 학생 (Soft Delete)                           |
+| `study_rooms`     | 자습실: 최대 인원, 운영 기간 (Soft Delete)   |
+| `visits`          | 방문 신청의 현재 상태 (학생-자습실 쌍당 1행) |
+| `visit_histories` | 신청·수정·취소 이벤트 로그 (append-only)     |
+
+- 신청(현재 상태)과 이력(이벤트)을 분리해 정원·중복 검사와 이력 조회를 각각 단순하게 유지
+- `UNIQUE(student_id, study_room_id)` + 상태 전환으로 중복 신청 방지와 취소 후 재신청을 함께 지원
+- 정원은 트랜잭션 안에서 자습실 행을 `FOR UPDATE`로 잠근 뒤 검사
+
+ERD와 자세한 설계 이유: [docs/database.md](./docs/database.md)
 
 ---
 
