@@ -6,3 +6,7 @@ allowBuilds:
   prisma: true
   '@prisma/engines': true
   '@scarf/scarf': false
+  esbuild: true
+
+# package.json engines(node >=24)와 맞지 않으면 설치를 중단한다
+engineStrict: true
