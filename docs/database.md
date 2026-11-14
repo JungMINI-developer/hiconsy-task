@@ -7,61 +7,102 @@
 
 ## ERD
 
+### 관계 개요
+
 ```mermaid
 erDiagram
-  students ||--o{ visits : "신청"
-  study_rooms ||--o{ visits : "신청 대상"
-  visits ||--|{ visit_histories : "이력"
-  students ||--o{ visit_histories : ""
-  study_rooms ||--o{ visit_histories : ""
+  STUDENT ||--o{ VISIT : "방문 신청"
+  STUDY_ROOM ||--o{ VISIT : "신청 대상"
+  VISIT ||--|{ VISIT_HISTORY : "변경 이력"
+  STUDENT ||--o{ VISIT_HISTORY : "학생별 이력"
+  STUDY_ROOM ||--o{ VISIT_HISTORY : "자습실별 이력"
+```
+
+- 학생 1명은 여러 자습실에 신청할 수 있고, 자습실 1개에는 여러 학생이 신청한다 → `visits`가 N:M을 풀어주는 테이블이다.
+- 같은 학생-자습실 쌍의 신청은 1행뿐이다 (`UNIQUE(student_id, study_room_id)`). 취소 후 재신청은 이 행의 상태를 되돌린다.
+- 신청 1건에는 이력이 1건 이상 있다 (최초 `APPLY`). 이력은 자습실·학생 기준으로도 바로 조회할 수 있게 FK를 함께 가진다.
+
+### 상세 ERD
+
+```mermaid
+erDiagram
+  students ||--o{ visits : "student_id"
+  study_rooms ||--o{ visits : "study_room_id"
+  visits ||--|{ visit_histories : "visit_id"
+  students ||--o{ visit_histories : "student_id"
+  study_rooms ||--o{ visit_histories : "study_room_id"
 
   students {
-    int id PK
-    varchar name
-    varchar phone
-    timestamptz created_at
-    timestamptz updated_at
-    timestamptz deleted_at "nullable, soft delete"
+    int id PK "SERIAL"
+    varchar(50) name "NOT NULL"
+    varchar(20) phone "NOT NULL"
+    timestamptz created_at "NOT NULL, DEFAULT now()"
+    timestamptz updated_at "NOT NULL"
+    timestamptz deleted_at "NULL = 활성, soft delete"
   }
 
   study_rooms {
-    int id PK
-    varchar name "추가 필드"
-    int max_personnel "CHECK > 0"
-    timestamptz start_date
-    timestamptz end_date "CHECK start_date < end_date"
-    timestamptz created_at
-    timestamptz updated_at
-    timestamptz deleted_at "nullable, soft delete"
+    int id PK "SERIAL"
+    varchar(100) name "NOT NULL, 화면 표시용 추가 필드"
+    int max_personnel "NOT NULL, CHECK > 0"
+    timestamptz start_date "NOT NULL, 운영 시작"
+    timestamptz end_date "NOT NULL, CHECK start_date < end_date"
+    timestamptz created_at "NOT NULL, DEFAULT now()"
+    timestamptz updated_at "NOT NULL"
+    timestamptz deleted_at "NULL = 활성, soft delete"
   }
 
   visits {
-    int id PK
-    int student_id FK "UNIQUE(student_id, study_room_id)"
-    int study_room_id FK
-    timestamptz start_at
-    timestamptz end_at "CHECK start_at < end_at"
-    enum status "APPLIED | CANCELED"
-    timestamptz canceled_at "nullable"
-    timestamptz created_at
-    timestamptz updated_at
+    int id PK "SERIAL"
+    int student_id FK,UK "UNIQUE(student_id, study_room_id)"
+    int study_room_id FK,UK
+    timestamptz start_at "NOT NULL, 방문 시작"
+    timestamptz end_at "NOT NULL, CHECK start_at < end_at"
+    VisitStatus status "NOT NULL, DEFAULT APPLIED"
+    timestamptz canceled_at "취소 시각, NULL 가능"
+    timestamptz created_at "NOT NULL, DEFAULT now()"
+    timestamptz updated_at "NOT NULL"
   }
 
   visit_histories {
-    int id PK
-    int visit_id FK
-    int study_room_id FK "비정규화"
-    int student_id FK "비정규화"
-    enum action "APPLY | UPDATE | CANCEL"
-    timestamptz prev_start_at "nullable"
-    timestamptz prev_end_at "nullable"
-    timestamptz start_at
-    timestamptz end_at
-    enum actor_type "STUDENT | INSTRUCTOR | SYSTEM"
-    varchar reason "nullable"
-    timestamptz created_at
+    int id PK "SERIAL"
+    int visit_id FK "NOT NULL"
+    int study_room_id FK "NOT NULL, 비정규화"
+    int student_id FK "NOT NULL, 비정규화"
+    VisitAction action "NOT NULL"
+    timestamptz prev_start_at "변경 전 구간, APPLY면 NULL"
+    timestamptz prev_end_at "변경 전 구간, APPLY면 NULL"
+    timestamptz start_at "NOT NULL, 변경 후 구간"
+    timestamptz end_at "NOT NULL, CHECK start_at < end_at"
+    ActorType actor_type "NOT NULL, DEFAULT STUDENT"
+    varchar(255) reason "처리 사유, NULL 가능"
+    timestamptz created_at "NOT NULL, DEFAULT now()"
   }
 ```
+
+> 표기: `||--o{` 1:0..N, `||--|{` 1:1..N / `PK` 기본키, `FK` 외래키, `UK` 복합 유니크 구성 컬럼.
+> 모든 FK는 `ON DELETE RESTRICT`이다.
+
+### Enum
+
+| Enum          | 값                                | 사용 컬럼                    | 의미                                                           |
+| ------------- | --------------------------------- | ---------------------------- | -------------------------------------------------------------- |
+| `VisitStatus` | `APPLIED`, `CANCELED`             | `visits.status`              | 유효 신청 / 취소. `APPLIED`만 정원에 포함                      |
+| `VisitAction` | `APPLY`, `UPDATE`, `CANCEL`       | `visit_histories.action`     | 신청(재신청 포함) / 방문 시간 수정 / 취소                      |
+| `ActorType`   | `STUDENT`, `INSTRUCTOR`, `SYSTEM` | `visit_histories.actor_type` | 이력을 남긴 주체. `SYSTEM`은 자습실 변경·삭제에 따른 자동 처리 |
+
+### 상태 흐름
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  [*] --> APPLIED : 신청 (APPLY)
+  APPLIED --> APPLIED : 시간 수정 (UPDATE)
+  APPLIED --> CANCELED : 취소 (CANCEL)
+  CANCELED --> APPLIED : 재신청 (APPLY)
+```
+
+상태가 바뀔 때마다 `visit_histories`에 해당 action으로 1행이 쌓인다.
 
 ## 테이블 설명
 
