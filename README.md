@@ -1,74 +1,118 @@
 # hiconsy-task
 
-하이컨시 과제전형 레포입니다. pnpm workspace + Turborepo 기반 풀스택 모노레포입니다.
+하이컨시 과제전형 레포입니다. Vue 3(FE)와 NestJS(BE)로 구성된 풀스택 모노레포입니다.
 
-## 기술 스택
+> TODO: 과제 주제 및 구현 기능 요약
 
-| 영역                       | 스택                                                                               |
-| -------------------------- | ---------------------------------------------------------------------------------- |
-| Frontend (`apps/web`)      | Vue 3, Vite, TypeScript, Vue Router, Pinia, Axios, Vitest, ESLint + oxlint         |
-| Backend (`apps/api`)       | NestJS 12 (ESM), Prisma 7, PostgreSQL 16, Swagger, class-validator, Vitest, oxlint |
-| Shared (`packages/shared`) | FE/BE 공통 타입 (API 응답 포맷 등)                                                 |
-| Monorepo                   | pnpm workspace, Turborepo                                                          |
+## 목차
 
-## 요구 사항
+1. [프로젝트 실행 방법](#1-프로젝트-실행-방법)
+2. [기술 스택 및 선택 이유](#2-기술-스택-및-선택-이유)
+3. [아키텍처 및 컨벤션](#3-아키텍처-및-컨벤션)
+4. [데이터베이스 스키마](#4-데이터베이스-스키마)
+5. [개발 시 고민한 점 / 아쉬운 점](#5-개발-시-고민한-점--아쉬운-점)
 
-- Node.js 24 이상 (`.nvmrc`)
-- pnpm 12 (`corepack enable`)
-- Docker (PostgreSQL)
+---
 
-## 실행 방법
+## 1. 프로젝트 실행 방법
+
+### 방법 A. Docker로 전체 실행 (권장)
+
+Docker만 설치되어 있으면 Node.js/pnpm 설치 없이 실행할 수 있습니다.
 
 ```bash
-pnpm install                      # 의존성 설치 + Prisma Client 생성
-cp apps/api/.env.example apps/api/.env
-pnpm db:up                        # PostgreSQL 실행 (localhost:5434)
-pnpm db:migrate                   # 마이그레이션 적용
-pnpm dev                          # web + api + shared(watch) 동시 실행
+docker compose up --build
 ```
 
-| 주소                           | 설명         |
-| ------------------------------ | ------------ |
-| http://localhost:5173          | 프론트엔드   |
-| http://localhost:3000/api      | 백엔드 API   |
-| http://localhost:3000/api/docs | Swagger 문서 |
+| 주소                           | 설명               |
+| ------------------------------ | ------------------ |
+| http://localhost:8080          | 프론트엔드 (nginx) |
+| http://localhost:3000/api      | 백엔드 API         |
+| http://localhost:3000/api/docs | Swagger API 문서   |
 
-> DB 호스트 포트는 기본 `5434`입니다. 바꾸려면 `POSTGRES_PORT`를 지정하고 `apps/api/.env`의 `DATABASE_URL`도 함께 수정하세요.
+컨테이너 시작 시 DB 마이그레이션과 시드 데이터가 자동으로 적용됩니다.
+종료: `docker compose down` (DB 데이터까지 삭제: `docker compose down -v`)
 
-## 스크립트
+### 방법 B. 로컬 개발 모드
 
-| 명령                          | 설명                                       |
-| ----------------------------- | ------------------------------------------ |
-| `pnpm dev`                    | 전체 개발 서버 실행                        |
-| `pnpm build`                  | 전체 빌드                                  |
-| `pnpm lint`                   | 전체 lint                                  |
-| `pnpm typecheck`              | 전체 타입 체크                             |
-| `pnpm test`                   | 전체 테스트                                |
-| `pnpm db:up` / `pnpm db:down` | PostgreSQL 컨테이너 시작 / 종료            |
-| `pnpm db:migrate`             | Prisma 마이그레이션 (`prisma migrate dev`) |
+요구 사항: Node.js 24+, pnpm 12 (`npm i -g pnpm@12` 또는 `corepack enable`), Docker
 
-특정 앱만 실행: `pnpm --filter @hiconsy/web dev`
+```bash
+pnpm install                          # 의존성 설치 + Prisma Client 생성
+cp apps/api/.env.example apps/api/.env
+pnpm db:up                            # PostgreSQL 실행 (localhost:5434)
+pnpm db:migrate                       # 마이그레이션 적용
+pnpm db:seed                          # 시드 데이터
+pnpm dev                              # web + api 동시 실행 (hot reload)
+```
 
-## 디렉터리 구조
+| 주소                           | 설명             |
+| ------------------------------ | ---------------- |
+| http://localhost:5173          | 프론트엔드       |
+| http://localhost:3000/api      | 백엔드 API       |
+| http://localhost:3000/api/docs | Swagger API 문서 |
+
+### 테스트
+
+```bash
+pnpm test        # 단위 테스트 (web, api)
+pnpm test:e2e    # API e2e 테스트 — pnpm db:up 필요, 테스트 전용 DB(hiconsy_test) 사용
+pnpm lint        # lint
+pnpm typecheck   # 타입 체크
+```
+
+모든 PR에서 GitHub Actions로 lint, 타입 체크, 테스트, 빌드, e2e(PostgreSQL), Docker 빌드를 검증합니다.
+
+### 포트 충돌 시
+
+| 환경변수        | 기본값 | 대상                   |
+| --------------- | ------ | ---------------------- |
+| `POSTGRES_PORT` | 5434   | PostgreSQL 호스트 포트 |
+| `API_PORT`      | 3000   | Docker api 포트        |
+| `WEB_PORT`      | 8080   | Docker web 포트        |
+
+`POSTGRES_PORT`를 바꾸면 `apps/api/.env`의 `DATABASE_URL`도 함께 수정해야 합니다.
+
+---
+
+## 2. 기술 스택 및 선택 이유
+
+| 영역      | 기술                                                                     |
+| --------- | ------------------------------------------------------------------------ |
+| Frontend  | Vue 3 (Composition API), Vite, TypeScript, Vue Router, Pinia, Axios      |
+| Backend   | NestJS 12, Prisma 7, PostgreSQL 16, Swagger, class-validator             |
+| 공통      | pnpm workspace, Turborepo, TypeScript, Vitest                            |
+| 품질 관리 | ESLint, oxlint, Prettier, husky, commitlint, lint-staged, GitHub Actions |
+| 인프라    | Docker, Docker Compose, nginx                                            |
+
+자세한 선택 이유: [docs/tech-stack.md](./docs/tech-stack.md)
+
+---
+
+## 3. 아키텍처 및 컨벤션
 
 ```
 apps/
-  web/        # Vue 3 프론트엔드
-  api/        # NestJS 백엔드 (prisma/ 스키마 포함)
+  web/              # Vue 3 SPA
+  api/              # NestJS REST API (+ prisma/ 스키마·마이그레이션)
 packages/
-  shared/     # FE/BE 공유 타입
-  tsconfig/   # 공통 tsconfig base
-docker-compose.yml
-turbo.json
-pnpm-workspace.yaml
+  shared/           # FE/BE 공유 타입 (API 요청/응답 계약)
+  tsconfig/         # 공통 tsconfig
+infra/postgres/     # DB 초기화 스크립트
+docs/               # 상세 문서
 ```
 
-## 컨벤션
+- 아키텍처 (인프라, 소스 코드 구조, 요청 흐름): [docs/architecture.md](./docs/architecture.md)
+- 컨벤션 (브랜치 전략, 커밋, 코드 스타일): [CONTRIBUTING.md](./CONTRIBUTING.md)
 
-브랜치 전략(Git Flow), 커밋/코드 컨벤션은 [CONTRIBUTING.md](./CONTRIBUTING.md)를 참고하세요.
+---
 
-## 개발 시 참고
+## 4. 데이터베이스 스키마
 
-- FE는 Vite dev proxy로 `/api` 요청을 `localhost:3000`에 보냅니다. 그래서 개발 중에는 CORS 설정 없이 호출할 수 있습니다.
-- `packages/shared`는 `tsc`로 빌드됩니다. `pnpm dev`를 실행하면 watch 모드로 함께 뜹니다.
-- Prisma Client는 `apps/api/src/generated/prisma`에 생성되고 git에는 올라가지 않습니다(`pnpm install` 때 자동 생성).
+스키마 구조(ERD)와 설계 이유: [docs/database.md](./docs/database.md)
+
+---
+
+## 5. 개발 시 고민한 점 / 아쉬운 점
+
+[docs/retrospective.md](./docs/retrospective.md)
