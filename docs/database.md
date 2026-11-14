@@ -35,7 +35,7 @@ erDiagram
   students {
     int id PK "SERIAL"
     varchar(50) name "NOT NULL"
-    varchar(20) phone "NOT NULL"
+    varchar(20) phone UK "NOT NULL, 활성 학생끼리 UNIQUE (부분 인덱스)"
     timestamptz created_at "NOT NULL, DEFAULT now()"
     timestamptz updated_at "NOT NULL"
     timestamptz deleted_at "NULL = 활성, soft delete"
@@ -151,39 +151,44 @@ stateDiagram-v2
 
 - `study_room_id`, `student_id`를 이력에도 둔다. `visits`를 거치지 않고 "자습실별 이력(FN-ROM-03)"과 "학생별 이력"을 시간순 인덱스(`(study_room_id, created_at)`, `(student_id, created_at)`)로 바로 조회하기 위해서다. 이력은 불변 데이터라 비정규화로 인한 갱신 이상이 없다.
 - `prev_start_at`/`prev_end_at`과 `start_at`/`end_at`으로 **변경 전후 값**을 함께 저장해, 다른 행을 찾아보지 않고도 "19시 → 20시로 변경" 같은 문장을 만들 수 있다.
-- `actor_type`(STUDENT / INSTRUCTOR / SYSTEM)과 `reason`은 선택 요구사항 FR-ROM-06(자습실 정원 축소·기간 변경·삭제 시 기존 신청 자동 처리)을 위해 미리 둔다. 시스템이 취소하면 `SYSTEM` + "자습실 삭제" 같은 사유를 남길 수 있다.
+- `actor_type`(STUDENT / INSTRUCTOR / SYSTEM)과 `reason`은 신청 당사자가 아닌 쪽의 변경으로 신청이 처리될 때를 위해 둔다. 자습실·학생이 삭제되면 유효 신청을 `SYSTEM` + "자습실 삭제" / "학생 삭제" 사유로 취소한다.
 
 ### 6. 삭제 정책
 
 - `students`, `study_rooms`는 명세대로 **Soft Delete**(`deleted_at`). 조회 시 `deleted_at IS NULL` 조건을 붙이며, 이를 위한 인덱스를 둔다.
 - 모든 FK는 `ON DELETE RESTRICT`. 물리 삭제를 하지 않는 정책이므로 실수로 지워져 이력이 연쇄 삭제되는 일을 DB 단에서 막는다.
 - `visits`에는 `deleted_at`을 두지 않았다. 신청의 "삭제"는 도메인상 취소(`CANCELED`)이기 때문이다.
+- 자습실·학생을 삭제하면 연결된 유효 신청을 같은 트랜잭션에서 자동 취소하고 이력을 남긴다. 삭제된 대상에 "살아 있는" 신청이 남지 않아 정원·목록 계산이 단순해진다.
 
 ### 7. 제약조건 정리
 
-| 대상          | 제약                             | 위치                        |
-| ------------- | -------------------------------- | --------------------------- |
-| `study_rooms` | `max_personnel > 0`              | DB CHECK                    |
-| `study_rooms` | `start_date < end_date`          | DB CHECK + DTO 검증         |
-| `visits`      | `start_at < end_at`              | DB CHECK + DTO 검증         |
-| `visits`      | 학생-자습실 1행                  | DB UNIQUE                   |
-| `visits`      | 방문 구간 ⊂ 자습실 운영 기간     | 서비스 로직                 |
-| `visits`      | 유효 신청 수 ≤ `max_personnel`   | 서비스 로직 (트랜잭션 + 락) |
-| `visits`      | 삭제된 자습실·학생에는 신청 불가 | 서비스 로직                 |
+| 대상          | 제약                             | 위치                                        |
+| ------------- | -------------------------------- | ------------------------------------------- |
+| `study_rooms` | `max_personnel > 0`              | DB CHECK                                    |
+| `study_rooms` | `start_date < end_date`          | DB CHECK + DTO 검증                         |
+| `visits`      | `start_at < end_at`              | DB CHECK + DTO 검증                         |
+| `visits`      | 학생-자습실 1행                  | DB UNIQUE                                   |
+| `students`    | 활성 학생끼리 전화번호 중복 불가 | DB 부분 UNIQUE (`WHERE deleted_at IS NULL`) |
+| `visits`      | 방문 구간 ⊂ 자습실 운영 기간     | 서비스 로직                                 |
+| `visits`      | 유효 신청 수 ≤ `max_personnel`   | 서비스 로직 (트랜잭션 + 락)                 |
+| `visits`      | 삭제된 자습실·학생에는 신청 불가 | 서비스 로직                                 |
+
+전화번호 부분 유니크 인덱스는 Prisma의 `partialIndexes` 프리뷰 기능(`@@unique(..., where: { deletedAt: null })`)으로 스키마에 표현했다. Soft Delete와 유니크 제약을 함께 쓰면 삭제된 행이 번호를 계속 점유하는 문제가 생기는데, 부분 인덱스로 이를 DB 레벨에서 해결한다.
 
 CHECK 제약은 Prisma 스키마 문법으로 표현할 수 없어 마이그레이션 SQL에 직접 추가했다. Prisma는 CHECK 제약을 비교 대상으로 보지 않으므로 이후 마이그레이션에서 지워지지 않는다(drift 확인 완료).
 
 ### 8. 인덱스
 
-| 인덱스                                        | 용도                                           |
-| --------------------------------------------- | ---------------------------------------------- |
-| `visits (student_id, study_room_id)` UNIQUE   | 중복 신청 방지, 내 신청 목록                   |
-| `visits (study_room_id, status)`              | 자습실별 현재 신청 인원 집계 (정원 검사, 목록) |
-| `visit_histories (study_room_id, created_at)` | 자습실 상세 이력 시간순 조회                   |
-| `visit_histories (student_id, created_at)`    | 학생별 이력 조회                               |
-| `visit_histories (visit_id)`                  | 신청 단건 이력                                 |
-| `study_rooms (deleted_at, start_date)`        | 삭제 제외 목록 + 운영 시작일 정렬              |
-| `students (deleted_at)`                       | 삭제 제외 학생 목록                            |
+| 인덱스                                             | 용도                                                     |
+| -------------------------------------------------- | -------------------------------------------------------- |
+| `visits (student_id, study_room_id)` UNIQUE        | 중복 신청 방지, 내 신청 목록                             |
+| `visits (study_room_id, status)`                   | 자습실별 현재 신청 인원 집계 (정원 검사, 목록)           |
+| `visit_histories (study_room_id, created_at)`      | 자습실 상세 이력 시간순 조회                             |
+| `visit_histories (student_id, created_at)`         | 학생별 이력 조회                                         |
+| `visit_histories (visit_id)`                       | 신청 단건 이력                                           |
+| `study_rooms (deleted_at, start_date)`             | 삭제 제외 목록 + 운영 시작일 정렬                        |
+| `students (deleted_at)`                            | 삭제 제외 학생 목록                                      |
+| `students (phone) WHERE deleted_at IS NULL` UNIQUE | 활성 학생 전화번호 중복 방지 (삭제된 번호는 재사용 가능) |
 
 ## 향후 확장 고려
 

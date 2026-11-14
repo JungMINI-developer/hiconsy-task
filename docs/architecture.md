@@ -39,6 +39,8 @@ src/
     interceptors/         # 반환값 → ApiSuccess 포맷
   prisma/                 # PrismaService (Global)
   study-rooms/            # 자습실 (controller, service, dto, mapper, 행 락)
+  students/               # 학생 (전화번호 정규화 포함)
+  visits/                 # 방문 신청 (시스템 자동 취소 공통 로직)
 test/                     # e2e (테스트 전용 DB, 테스트마다 테이블 초기화)
 prisma/
   schema.prisma
@@ -79,6 +81,11 @@ prisma/
 | GET    | `/api/study-rooms/:id/histories` | 방문 신청·수정·취소 이력 (시간순)       | 404 `STUDY_ROOM_NOT_FOUND`                             |
 | PATCH  | `/api/study-rooms/:id`           | 자습실 수정 (보낸 필드만)               | 409 `CAPACITY_BELOW_CURRENT`, `PERIOD_EXCLUDES_VISITS` |
 | DELETE | `/api/study-rooms/:id`           | Soft Delete + 유효 신청 자동 취소 (204) | 404 `STUDY_ROOM_NOT_FOUND`                             |
+| GET    | `/api/students`                  | 학생 목록 (삭제 제외, 이름순)           |                                                        |
+| POST   | `/api/students`                  | 학생 등록 (전화번호 정규화)             | 409 `DUPLICATE_PHONE`                                  |
+| GET    | `/api/students/:id`              | 학생 상세                               | 404 `STUDENT_NOT_FOUND`                                |
+| PATCH  | `/api/students/:id`              | 학생 수정 (보낸 필드만)                 | 404 `STUDENT_NOT_FOUND`, 409 `DUPLICATE_PHONE`         |
+| DELETE | `/api/students/:id`              | Soft Delete + 유효 신청 자동 취소 (204) | 404 `STUDENT_NOT_FOUND`                                |
 
 #### 동시성 제어
 
