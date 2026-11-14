@@ -103,7 +103,7 @@ src/
 
 ### 데이터·에러
 
-- 응답 타입은 `packages/shared`에 도메인 타입(`StudyRoomDto`, `VisitDto`, `VisitHistoryDto`)을 추가해 FE/BE가 공유합니다.
+- 요청·응답 타입은 `packages/shared`의 것을 그대로 씁니다(`StudyRoom`, `StudyRoomHistory`, `Student`, `Create*/Update*Request`, `ErrorCode`). 방문 타입은 방문 API 구현 시 같은 위치에 추가됩니다.
 - `src/api/client.ts` 인터셉터에서 `ApiError`를 `AppError { code, message, details, status }`로 정규화합니다. 화면은 `code`로 분기만 합니다([interaction-rules.md](./interaction-rules.md#서버-응답-처리)).
 - 날짜는 API 경계에서 ISO 문자열 ↔ `@internationalized/date` 객체로 변환하고, 화면 표시는 `utils/datetime.ts`만 씁니다.
 

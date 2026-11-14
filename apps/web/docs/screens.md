@@ -99,7 +99,7 @@
 ```
 
 - 검증은 [interaction-rules.md](./interaction-rules.md#폼-검증)를 따릅니다.
-- 수정 시 현재 신청 인원보다 작은 정원, 기존 신청이 밖으로 밀려나는 운영 기간을 입력하면 저장 전에 **영향받는 신청 n건**을 경고합니다(FR-ROM-06 처리 방식은 interaction-rules 참고).
+- 수정 시 현재 신청 인원보다 작은 정원은 입력 단계에서 막고(`currentPersonnel` 기준), 유효 신청이 새 운영 기간 밖으로 벗어나면 서버가 `PERIOD_EXCLUDES_VISITS`로 거절합니다. 이때 다이얼로그를 유지하고 신청자 탭으로 갈 수 있는 링크를 보여줍니다([interaction-rules.md](./interaction-rules.md#9절-규칙의-ui-반영)).
 - 저장 중 버튼은 로딩 표시 + 비활성. 실패 시 다이얼로그를 닫지 않고 상단에 에러를 보여줍니다.
 
 ## S-13 강사 · 학생 목록 `/teacher/students`
