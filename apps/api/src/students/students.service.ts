@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { CancelReason, cancelAppliedVisitsBySystem } from '../visits/visit-cancellation.js';
 import type { CreateStudentDto } from './dto/create-student.dto.js';
 import type { UpdateStudentDto } from './dto/update-student.dto.js';
+import { lockStudent, studentNotFound } from './student-lock.js';
 import { toStudent } from './student.mapper.js';
 
 @Injectable()
@@ -50,24 +51,13 @@ export class StudentsService {
    */
   async remove(id: number): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<{ id: number }[]>`
-        SELECT id FROM students WHERE id = ${id} AND deleted_at IS NULL FOR UPDATE
-      `;
-      if (rows.length === 0) throw studentNotFound();
+      await lockStudent(tx, id, 'update');
 
       const now = new Date();
       await cancelAppliedVisitsBySystem(tx, { studentId: id }, CancelReason.STUDENT_DELETED, now);
       await tx.student.update({ where: { id }, data: { deletedAt: now } });
     });
   }
-}
-
-function studentNotFound(): DomainException {
-  return new DomainException(
-    ErrorCode.STUDENT_NOT_FOUND,
-    '학생을 찾을 수 없습니다.',
-    HttpStatus.NOT_FOUND,
-  );
 }
 
 /** 전화번호 부분 유니크 인덱스(students_phone_active_key) 위반을 도메인 에러로 바꾼다 */

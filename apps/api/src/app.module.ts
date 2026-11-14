@@ -8,6 +8,7 @@ import { HealthController } from './health/health.controller.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { StudentsModule } from './students/students.module.js';
 import { StudyRoomsModule } from './study-rooms/study-rooms.module.js';
+import { VisitsModule } from './visits/visits.module.js';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { StudyRoomsModule } from './study-rooms/study-rooms.module.js';
     PrismaModule,
     StudyRoomsModule,
     StudentsModule,
+    VisitsModule,
   ],
   controllers: [HealthController],
   providers: [
