@@ -1,0 +1,12 @@
+/**
+ * 도메인 에러 코드. 공통 에러 포맷의 error.code로 내려간다.
+ * 도메인 코드가 없는 에러는 HTTP 상태명(NOT_FOUND, BAD_REQUEST 등)을 사용한다.
+ */
+export const ErrorCode = {
+  STUDY_ROOM_NOT_FOUND: 'STUDY_ROOM_NOT_FOUND',
+  INVALID_PERIOD: 'INVALID_PERIOD',
+  CAPACITY_BELOW_CURRENT: 'CAPACITY_BELOW_CURRENT',
+  PERIOD_EXCLUDES_VISITS: 'PERIOD_EXCLUDES_VISITS',
+} as const;
+
+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

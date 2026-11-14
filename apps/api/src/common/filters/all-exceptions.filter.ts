@@ -20,12 +20,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const status =
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 
+    let code: string = HttpStatus[status] ?? 'UNKNOWN_ERROR';
     let message = '서버 내부 오류가 발생했습니다.';
     let details: string[] | undefined;
 
     if (exception instanceof HttpException) {
       const body = exception.getResponse();
       const raw = typeof body === 'string' ? body : (body as { message?: unknown }).message;
+      const bodyCode = typeof body === 'object' ? (body as { code?: unknown }).code : undefined;
+      if (typeof bodyCode === 'string') code = bodyCode;
       if (Array.isArray(raw)) {
         message = '요청 값이 올바르지 않습니다.';
         details = raw.map(String);
@@ -40,7 +43,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const payload: ApiError = {
       success: false,
-      error: { code: HttpStatus[status] ?? 'UNKNOWN_ERROR', message, details },
+      error: { code, message, details },
     };
     response.status(status).json(payload);
   }
