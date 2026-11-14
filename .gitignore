@@ -7,3 +7,7 @@ coverage/
 .env.local
 .DS_Store
 *.log
+
+# 디자인 스킬: 플랫폼별 엔진 바이너리(실행 시 자동 다운로드), 개인 훅 설정
+.claude/skills/impeccable/scripts/bin/
+.claude/settings.local.json
