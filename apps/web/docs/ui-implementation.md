@@ -94,27 +94,29 @@ src/
 
 ## 디자인 스킬 설치
 
-스타 등록한 디자인 스킬은 레포의 `.claude/skills/`에 **이미 포함**되어 있습니다. 클론하면 Claude Code에서 바로 `/impeccable`, `/better-colors` 등을 쓸 수 있습니다.
+디자인 스킬은 프로젝트 의존성이 아니라 **개발자의 도구**이므로 레포에 넣지 않고 Claude Code 사용자 전역(`~/.claude/skills`)에 설치합니다. 레포에는 이 문서(어떤 단계에서 어떤 스킬을 쓰는지)만 남깁니다.
 
-| 스킬                                                                                                            | 출처 (설치 시점 버전)                               | 설치 방법                                                                  |
-| --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------- |
-| `impeccable` (+ `.claude/agents/impeccable-*`)                                                                  | pbakaus/impeccable, 엔진 v0.1.23                    | `npx impeccable install --project --providers=claude`                      |
-| `better-*`, `interface-review`, `state-machine`, `variant`, `break`, `build-design`, `explain-interface`, `afk` | jakubkrehel/skills (`skills-lock.json`)             | `npx skills add jakubkrehel/skills --skill '*' --agent claude-code --copy` |
-| `unslop`                                                                                                        | heydamir/unslop `97daa3e` (CC BY 4.0, LICENSE 포함) | `skills/unslop` 폴더 복사                                                  |
-| `frontend-design`                                                                                               | anthropics/skills `2c5958e`                         | `skills/frontend-design` 폴더 복사                                         |
+```bash
+# impeccable — 훅 없이 전역 설치 (훅을 켜면 모든 프로젝트의 파일 수정마다 검사가 돈다)
+npx impeccable install --user --providers=claude --no-hooks -y
 
-레포에 넣지 않은 것 (`.gitignore`):
+# jakubkrehel/skills — better-*, interface-review, state-machine 등 14종
+npx skills add jakubkrehel/skills -g --skill '*' --agent claude-code --copy -y
 
-- `.claude/skills/impeccable/scripts/bin/` — 플랫폼별 엔진 바이너리(약 18MB). 처음 실행할 때 런처가 `engine-checksums.txt`로 검증하며 내려받습니다.
-- `.claude/settings.local.json` — impeccable 디자인 훅(Edit/Write 후 UI 파일 검사, 세션 종료 시 전체 검사). 평가자 환경에서 자동 실행되지 않도록 개인 설정으로 둡니다. 켜려면 레포 루트에서 `npx impeccable install --project --providers=claude -y`를 다시 실행합니다.
+# unslop — 수동 복사 (CC BY 4.0)
+git clone --depth 1 https://github.com/heydamir/unslop /tmp/unslop
+cp -r /tmp/unslop/skills/unslop ~/.claude/skills/
 
-업데이트: `npx skills update -p`(jakubkrehel), `npx impeccable install --project --providers=claude --force`.
+# frontend-design — anthropics/skills 플러그인으로 제공되므로 별도 설치 불필요
+```
+
+업데이트: `npx skills update -g`(jakubkrehel), `npx impeccable install --user --providers=claude --no-hooks --force`.
 
 | 주의할 점                                                                                                                                                          |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | impeccable `live` 모드는 로컬 체크아웃 전용이며, Apply 시 권한 우회 플래그로 에이전트를 실행할 수 있다. 쓰지 않거나 `IMPECCABLE_LIVE_COPY_AGENT=chat`으로 제한한다 |
 | `afk`는 자리를 비운 동안 에이전트가 스스로 개선 작업을 하는 스킬이다. 직접 호출할 때만 동작하며, 이 과제에서는 쓰지 않는다                                         |
-| 슬롭 검출기는 에이전트 없이도 돌릴 수 있다: `.claude/skills/impeccable/scripts/impeccable detect apps/web/src`, 개발 서버 대상 `... detect http://localhost:5173`  |
+| 슬롭 검출기는 에이전트 없이도 돌릴 수 있다: `npx impeccable detect apps/web/src`, 개발 서버 대상 `npx impeccable detect http://localhost:5173`                     |
 | CI 추가 여부는 기반 구현 후 결정 (`--github` 옵션으로 PR 주석 가능)                                                                                                |
 
 ### 사용 예

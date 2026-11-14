@@ -2,8 +2,3 @@ dist
 coverage
 pnpm-lock.yaml
 apps/api/src/generated
-
-# 외부에서 설치한 디자인 스킬 (원본 그대로 유지)
-.claude/skills
-.claude/agents
-skills-lock.json
