@@ -3,7 +3,9 @@
     "Vue.volar",
     "vitest.explorer",
     "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
     "EditorConfig.EditorConfig",
-    "oxc.oxc-vscode"
+    "oxc.oxc-vscode",
+    "Prisma.prisma"
   ]
 }
