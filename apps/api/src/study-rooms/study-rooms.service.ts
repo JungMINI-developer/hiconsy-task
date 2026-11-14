@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ErrorCode, type StudyRoom, type StudyRoomHistory } from '@hiconsy/shared';
 import { DomainException } from '../common/exceptions/domain.exception.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { CancelReason, cancelAppliedVisitsBySystem } from '../visits/visit-cancellation.js';
 import type { CreateStudyRoomDto } from './dto/create-study-room.dto.js';
 import type { UpdateStudyRoomDto } from './dto/update-study-room.dto.js';
 import { lockStudyRoom, studyRoomNotFound } from './study-room-lock.js';
@@ -11,8 +12,6 @@ import { toStudyRoom, toStudyRoomHistory } from './study-room.mapper.js';
 const withAppliedCount = {
   _count: { select: { visits: { where: { status: 'APPLIED' as const } } } },
 };
-
-export const STUDY_ROOM_DELETED_REASON = '자습실 삭제';
 
 @Injectable()
 export class StudyRoomsService {
@@ -111,27 +110,12 @@ export class StudyRoomsService {
       await lockStudyRoom(tx, id);
       const now = new Date();
 
-      const applied = await tx.visit.findMany({ where: { studyRoomId: id, status: 'APPLIED' } });
-      if (applied.length > 0) {
-        await tx.visit.updateMany({
-          where: { id: { in: applied.map((visit) => visit.id) } },
-          data: { status: 'CANCELED', canceledAt: now },
-        });
-        await tx.visitHistory.createMany({
-          data: applied.map((visit) => ({
-            visitId: visit.id,
-            studyRoomId: id,
-            studentId: visit.studentId,
-            action: 'CANCEL' as const,
-            prevStartAt: visit.startAt,
-            prevEndAt: visit.endAt,
-            startAt: visit.startAt,
-            endAt: visit.endAt,
-            actorType: 'SYSTEM' as const,
-            reason: STUDY_ROOM_DELETED_REASON,
-          })),
-        });
-      }
+      await cancelAppliedVisitsBySystem(
+        tx,
+        { studyRoomId: id },
+        CancelReason.STUDY_ROOM_DELETED,
+        now,
+      );
 
       await tx.studyRoom.update({ where: { id }, data: { deletedAt: now } });
     });
