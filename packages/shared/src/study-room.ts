@@ -1,4 +1,8 @@
-/** 날짜는 API 경계에서 ISO 8601 문자열로 주고받는다 */
+/**
+ * 날짜는 API 경계에서 ISO 8601 문자열로 주고받는다.
+ * - 응답: 항상 KST 오프셋 (예: 2026-11-15T19:00:00.000+09:00)
+ * - 요청: 오프셋이 있는 어떤 ISO 문자열이든 허용 (예: ...+09:00, ...Z)
+ */
 export type IsoDateString = string;
 
 export type VisitStatus = 'APPLIED' | 'CANCELED';

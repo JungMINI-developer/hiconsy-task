@@ -7,8 +7,8 @@ import { createTestApp, resetDatabase } from './helpers.js';
 const room = {
   name: 'A 자습실',
   maxPersonnel: 3,
-  startDate: '2030-01-10T09:00:00.000Z',
-  endDate: '2030-01-10T22:00:00.000Z',
+  startDate: '2030-01-10T09:00:00.000+09:00',
+  endDate: '2030-01-10T22:00:00.000+09:00',
 };
 
 describe('StudyRooms (e2e)', () => {
@@ -65,6 +65,16 @@ describe('StudyRooms (e2e)', () => {
       });
     });
 
+    it('UTC(Z)로 보내도 응답은 KST(+09:00)로 준다', async () => {
+      const res = await api()
+        .post('/api/study-rooms')
+        .send({ ...room, startDate: '2030-01-10T00:00:00Z', endDate: '2030-01-10T13:00:00Z' })
+        .expect(201);
+      expect(res.body.data.startDate).toBe('2030-01-10T09:00:00.000+09:00');
+      expect(res.body.data.endDate).toBe('2030-01-10T22:00:00.000+09:00');
+      expect(res.body.data.createdAt).toMatch(/\+09:00$/);
+    });
+
     it('시작 일시가 종료 일시보다 늦으면 INVALID_PERIOD', async () => {
       const res = await api()
         .post('/api/study-rooms')
@@ -87,8 +97,12 @@ describe('StudyRooms (e2e)', () => {
     it('삭제된 자습실을 제외하고, 현재 신청 인원(취소 제외)을 함께 준다', async () => {
       const roomId = await createRoom();
       const deletedId = await createRoom({ name: '삭제될 자습실' });
-      await applyVisit(roomId, '2030-01-10T10:00:00Z', '2030-01-10T12:00:00Z', '학생1');
-      const canceled = await applyVisit(roomId, '2030-01-10T10:00:00Z', '2030-01-10T12:00:00Z');
+      await applyVisit(roomId, '2030-01-10T10:00:00+09:00', '2030-01-10T12:00:00+09:00', '학생1');
+      const canceled = await applyVisit(
+        roomId,
+        '2030-01-10T10:00:00+09:00',
+        '2030-01-10T12:00:00+09:00',
+      );
       await prisma.visit.update({ where: { id: canceled.id }, data: { status: 'CANCELED' } });
       await api().delete(`/api/study-rooms/${deletedId}`).expect(204);
 
@@ -117,8 +131,8 @@ describe('StudyRooms (e2e)', () => {
 
     it('최대 인원을 현재 신청 인원보다 작게 줄이면 CAPACITY_BELOW_CURRENT', async () => {
       const roomId = await createRoom();
-      await applyVisit(roomId, '2030-01-10T10:00:00Z', '2030-01-10T12:00:00Z');
-      await applyVisit(roomId, '2030-01-10T10:00:00Z', '2030-01-10T12:00:00Z');
+      await applyVisit(roomId, '2030-01-10T10:00:00+09:00', '2030-01-10T12:00:00+09:00');
+      await applyVisit(roomId, '2030-01-10T10:00:00+09:00', '2030-01-10T12:00:00+09:00');
 
       const res = await api()
         .patch(`/api/study-rooms/${roomId}`)
@@ -132,29 +146,33 @@ describe('StudyRooms (e2e)', () => {
 
     it('운영 기간 밖으로 밀려나는 신청이 있으면 PERIOD_EXCLUDES_VISITS', async () => {
       const roomId = await createRoom();
-      await applyVisit(roomId, '2030-01-10T19:00:00Z', '2030-01-10T21:00:00Z');
+      await applyVisit(roomId, '2030-01-10T19:00:00+09:00', '2030-01-10T21:00:00+09:00');
 
       const res = await api()
         .patch(`/api/study-rooms/${roomId}`)
-        .send({ endDate: '2030-01-10T20:00:00Z' })
+        .send({ endDate: '2030-01-10T20:00:00+09:00' })
         .expect(409);
       expect(res.body.error.code).toBe('PERIOD_EXCLUDES_VISITS');
 
       // 신청 구간을 포함하는 기간으로는 변경할 수 있다
       await api()
         .patch(`/api/study-rooms/${roomId}`)
-        .send({ endDate: '2030-01-10T21:00:00Z' })
+        .send({ endDate: '2030-01-10T21:00:00+09:00' })
         .expect(200);
     });
 
     it('취소된 신청은 기간 변경을 막지 않는다', async () => {
       const roomId = await createRoom();
-      const visit = await applyVisit(roomId, '2030-01-10T19:00:00Z', '2030-01-10T21:00:00Z');
+      const visit = await applyVisit(
+        roomId,
+        '2030-01-10T19:00:00+09:00',
+        '2030-01-10T21:00:00+09:00',
+      );
       await prisma.visit.update({ where: { id: visit.id }, data: { status: 'CANCELED' } });
 
       await api()
         .patch(`/api/study-rooms/${roomId}`)
-        .send({ endDate: '2030-01-10T12:00:00Z' })
+        .send({ endDate: '2030-01-10T12:00:00+09:00' })
         .expect(200);
     });
 
@@ -162,7 +180,7 @@ describe('StudyRooms (e2e)', () => {
       const roomId = await createRoom();
       const res = await api()
         .patch(`/api/study-rooms/${roomId}`)
-        .send({ startDate: '2030-01-11T00:00:00Z' })
+        .send({ startDate: '2030-01-11T00:00:00+09:00' })
         .expect(400);
       expect(res.body.error.code).toBe('INVALID_PERIOD');
     });
@@ -171,7 +189,11 @@ describe('StudyRooms (e2e)', () => {
   describe('DELETE /api/study-rooms/:id', () => {
     it('Soft Delete하고 유효 신청을 SYSTEM 사유로 자동 취소한다', async () => {
       const roomId = await createRoom();
-      const visit = await applyVisit(roomId, '2030-01-10T10:00:00Z', '2030-01-10T12:00:00Z');
+      const visit = await applyVisit(
+        roomId,
+        '2030-01-10T10:00:00+09:00',
+        '2030-01-10T12:00:00+09:00',
+      );
 
       await api().delete(`/api/study-rooms/${roomId}`).expect(204);
 
@@ -204,8 +226,8 @@ describe('StudyRooms (e2e)', () => {
       const roomId = await createRoom();
       const visit = await applyVisit(
         roomId,
-        '2030-01-10T10:00:00Z',
-        '2030-01-10T12:00:00Z',
+        '2030-01-10T10:00:00+09:00',
+        '2030-01-10T12:00:00+09:00',
         '김하이',
       );
       await prisma.visitHistory.create({
@@ -214,10 +236,10 @@ describe('StudyRooms (e2e)', () => {
           studentId: visit.studentId,
           studyRoomId: roomId,
           action: 'UPDATE',
-          prevStartAt: '2030-01-10T10:00:00Z',
-          prevEndAt: '2030-01-10T12:00:00Z',
-          startAt: '2030-01-10T11:00:00Z',
-          endAt: '2030-01-10T13:00:00Z',
+          prevStartAt: '2030-01-10T10:00:00+09:00',
+          prevEndAt: '2030-01-10T12:00:00+09:00',
+          startAt: '2030-01-10T11:00:00+09:00',
+          endAt: '2030-01-10T13:00:00+09:00',
         },
       });
 
@@ -230,8 +252,8 @@ describe('StudyRooms (e2e)', () => {
       });
       expect(res.body.data[1]).toMatchObject({
         action: 'UPDATE',
-        prevStartAt: '2030-01-10T10:00:00.000Z',
-        startAt: '2030-01-10T11:00:00.000Z',
+        prevStartAt: '2030-01-10T10:00:00.000+09:00',
+        startAt: '2030-01-10T11:00:00.000+09:00',
       });
     });
   });

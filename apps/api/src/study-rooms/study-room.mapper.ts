@@ -4,6 +4,7 @@ import type {
   Student as StudentRow,
   VisitHistory as VisitHistoryRow,
 } from '../generated/prisma/client.js';
+import { toKstIso, toKstIsoOrNull } from '../common/utils/date.js';
 
 export function toStudyRoom(row: StudyRoomRow, currentPersonnel: number): StudyRoom {
   return {
@@ -11,10 +12,10 @@ export function toStudyRoom(row: StudyRoomRow, currentPersonnel: number): StudyR
     name: row.name,
     maxPersonnel: row.maxPersonnel,
     currentPersonnel,
-    startDate: row.startDate.toISOString(),
-    endDate: row.endDate.toISOString(),
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
+    startDate: toKstIso(row.startDate),
+    endDate: toKstIso(row.endDate),
+    createdAt: toKstIso(row.createdAt),
+    updatedAt: toKstIso(row.updatedAt),
   };
 }
 
@@ -26,12 +27,12 @@ export function toStudyRoomHistory(
     visitId: row.visitId,
     student: { id: row.student.id, name: row.student.name },
     action: row.action,
-    prevStartAt: row.prevStartAt?.toISOString() ?? null,
-    prevEndAt: row.prevEndAt?.toISOString() ?? null,
-    startAt: row.startAt.toISOString(),
-    endAt: row.endAt.toISOString(),
+    prevStartAt: toKstIsoOrNull(row.prevStartAt),
+    prevEndAt: toKstIsoOrNull(row.prevEndAt),
+    startAt: toKstIso(row.startAt),
+    endAt: toKstIso(row.endAt),
     actorType: row.actorType,
     reason: row.reason,
-    createdAt: row.createdAt.toISOString(),
+    createdAt: toKstIso(row.createdAt),
   };
 }
