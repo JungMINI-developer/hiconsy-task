@@ -63,15 +63,40 @@ pnpm typecheck   # 타입 체크
 
 모든 PR에서 GitHub Actions로 lint, 타입 체크, 테스트, 빌드, e2e(PostgreSQL), Docker 빌드를 검증합니다.
 
-### 포트 충돌 시
+### 환경변수
 
-| 환경변수        | 기본값 | 대상                   |
-| --------------- | ------ | ---------------------- |
-| `POSTGRES_PORT` | 5434   | PostgreSQL 호스트 포트 |
-| `API_PORT`      | 3000   | Docker api 포트        |
-| `WEB_PORT`      | 8080   | Docker web 포트        |
+| 파일            | 읽는 곳                                | 필요 여부                       |
+| --------------- | -------------------------------------- | ------------------------------- |
+| `.env` (루트)   | `docker-compose.yml`                   | 선택. 없으면 기본값 사용        |
+| `apps/api/.env` | NestJS, Prisma CLI (마이그레이션·시드) | 로컬 개발 모드에서 필수         |
+| `apps/web/.env` | Vite                                   | 선택. 비우면 `/api` 프록시 사용 |
 
-`POSTGRES_PORT`를 바꾸면 `apps/api/.env`의 `DATABASE_URL`도 함께 수정해야 합니다.
+루트 `.env`로 바꿀 수 있는 값 (`cp .env.example .env`):
+
+| 환경변수            | 기본값    | 대상                   |
+| ------------------- | --------- | ---------------------- |
+| `POSTGRES_USER`     | `hiconsy` | DB 사용자              |
+| `POSTGRES_PASSWORD` | `hiconsy` | DB 비밀번호            |
+| `POSTGRES_DB`       | `hiconsy` | DB 이름                |
+| `POSTGRES_PORT`     | `5434`    | PostgreSQL 호스트 포트 |
+| `API_PORT`          | `3000`    | Docker api 포트        |
+| `WEB_PORT`          | `8080`    | Docker web 포트        |
+
+Docker 전체 실행(방법 A)에서는 api 컨테이너의 `DATABASE_URL`이 위 값으로 자동 조합됩니다.
+로컬 개발 모드(방법 B)에서 DB 값이나 포트를 바꿨다면 `apps/api/.env`의 `DATABASE_URL`도 같이 맞춰야 합니다.
+
+### DB 접속 (pgAdmin, DBeaver 등)
+
+| 항목     | 값 (기본값)                            |
+| -------- | -------------------------------------- |
+| Host     | `localhost`                            |
+| Port     | `5434` (`POSTGRES_PORT`)               |
+| Database | `hiconsy` (e2e 테스트: `hiconsy_test`) |
+| Username | `hiconsy`                              |
+| Password | `hiconsy`                              |
+
+- pgAdmin을 Docker로 실행했다면 Host에 `host.docker.internal`을 입력합니다.
+- GUI 없이 보려면 `pnpm --filter @hiconsy/api prisma:studio`를 실행합니다.
 
 ---
 
