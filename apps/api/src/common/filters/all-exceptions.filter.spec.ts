@@ -1,4 +1,6 @@
-import { ArgumentsHost, BadRequestException, NotFoundException } from '@nestjs/common';
+import { ArgumentsHost, BadRequestException, HttpStatus, NotFoundException } from '@nestjs/common';
+import { ErrorCode } from '@hiconsy/shared';
+import { DomainException } from '../exceptions/domain.exception.js';
 import { AllExceptionsFilter } from './all-exceptions.filter.js';
 
 function mockHost() {
@@ -33,6 +35,28 @@ describe('AllExceptionsFilter', () => {
         error: expect.objectContaining({ code: 'BAD_REQUEST', details: ['name must be a string'] }),
       }),
     );
+  });
+
+  it('DomainException은 도메인 에러 코드를 code로 담는다', () => {
+    const { host, status, json } = mockHost();
+    filter.catch(
+      new DomainException(
+        ErrorCode.STUDY_ROOM_NOT_FOUND,
+        '자습실을 찾을 수 없습니다.',
+        HttpStatus.NOT_FOUND,
+      ),
+      host,
+    );
+
+    expect(status).toHaveBeenCalledWith(404);
+    expect(json).toHaveBeenCalledWith({
+      success: false,
+      error: {
+        code: 'STUDY_ROOM_NOT_FOUND',
+        message: '자습실을 찾을 수 없습니다.',
+        details: undefined,
+      },
+    });
   });
 
   it('알 수 없는 예외는 500으로 응답한다', () => {
