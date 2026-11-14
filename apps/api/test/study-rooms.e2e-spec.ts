@@ -37,9 +37,13 @@ describe('StudyRooms (e2e)', () => {
     return res.body.data.id as number;
   }
 
+  let phoneSeq = 0;
+
   /** 테스트용 방문 신청 (방문 API 구현 전이라 DB에 직접 생성) */
   async function applyVisit(roomId: number, startAt: string, endAt: string, name = '학생') {
-    const student = await prisma.student.create({ data: { name, phone: '010-0000-0000' } });
+    phoneSeq += 1;
+    const phone = `010-0000-${String(phoneSeq).padStart(4, '0')}`;
+    const student = await prisma.student.create({ data: { name, phone } });
     const visit = await prisma.visit.create({
       data: { studentId: student.id, studyRoomId: roomId, startAt, endAt },
     });

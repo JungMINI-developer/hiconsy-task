@@ -7,6 +7,8 @@ export const ErrorCode = {
   INVALID_PERIOD: 'INVALID_PERIOD',
   CAPACITY_BELOW_CURRENT: 'CAPACITY_BELOW_CURRENT',
   PERIOD_EXCLUDES_VISITS: 'PERIOD_EXCLUDES_VISITS',
+  STUDENT_NOT_FOUND: 'STUDENT_NOT_FOUND',
+  DUPLICATE_PHONE: 'DUPLICATE_PHONE',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

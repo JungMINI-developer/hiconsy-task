@@ -3,6 +3,7 @@ generator client {
   output              = "../src/generated/prisma"
   moduleFormat        = "esm"
   importFileExtension = "js"
+  previewFeatures     = ["partialIndexes"]
 }
 
 datasource db {
@@ -41,6 +42,8 @@ model Student {
   visits    Visit[]
   histories VisitHistory[]
 
+  /// 삭제되지 않은 학생끼리만 전화번호 중복 불가 (삭제된 학생의 번호는 재등록 가능)
+  @@unique([phone], map: "students_phone_active_key", where: { deletedAt: null })
   @@index([deletedAt])
   @@map("students")
 }
