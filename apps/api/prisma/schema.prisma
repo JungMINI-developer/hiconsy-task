@@ -2,6 +2,8 @@ generator client {
   provider     = "prisma-client"
   output       = "../src/generated/prisma"
   moduleFormat = "esm"
+  // 생성 환경(tsconfig 유무)에 따라 추론이 달라지지 않도록 ESM 런타임용 .js 확장자를 명시
+  importFileExtension = "js"
 }
 
 datasource db {
