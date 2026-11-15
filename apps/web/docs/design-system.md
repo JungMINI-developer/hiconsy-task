@@ -133,22 +133,24 @@ OKLCH로 정의합니다. 라이트 모드만 MVP 범위이고, 다크 모드는
 
 ### `components/ui` — 범용 (도메인 모름)
 
-| 컴포넌트                                  | 기반                                            | 비고                                                     |
-| ----------------------------------------- | ----------------------------------------------- | -------------------------------------------------------- |
-| `AppButton`                               | 자체 (`<button>`) + `cva`                       | variant: primary / secondary / ghost / danger, `loading` |
-| `AppDialog`                               | Reka UI `Dialog`                                | 포커스 트랩, ESC, 스크롤 잠금                            |
-| `ConfirmDialog`                           | Reka UI `AlertDialog`                           | 확인/닫기, 기본 포커스는 닫기                            |
-| `AppSelect`                               | Reka UI `Select`                                | 학생 선택, 시간 선택                                     |
-| `AppNumberField`                          | Reka UI `NumberField`                           | 최대 인원                                                |
-| `AppDatePicker`                           | Reka UI `DatePicker`                            | 운영 기간 날짜, 방문 날짜 (min/max 제한)                 |
-| `AppTimeField`                            | Reka UI `TimeField` 또는 `AppSelect`(30분 단위) | 방문 시간은 Select가 더 빠름                             |
-| `AppTabs`                                 | Reka UI `Tabs`                                  | 목록 필터, 상세 탭                                       |
-| `AppToast`                                | Reka UI `Toast`                                 | 성공·에러 알림, `aria-live`                              |
-| `AppTooltip`                              | Reka UI `Tooltip`                               | 비활성 버튼 이유                                         |
-| `AppDropdownMenu`                         | Reka UI `DropdownMenu`                          | 카드 `[⋯]` 메뉴                                          |
-| `AppBadge`                                | 자체 + `cva`                                    | 상태 배지 (tone: open/warn/full/applied/canceled/ended)  |
-| `FormField`                               | 자체                                            | label + control + hint/error, id 자동 연결               |
-| `AppSkeleton`, `EmptyState`, `ErrorState` | 자체                                            | 5종 상태 표준화                                          |
+| 컴포넌트                                  | 기반                                      | 비고                                                                                        |
+| ----------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `AppButton`                               | 자체 (`<button>`) + `cva`                 | variant: primary / secondary / ghost / danger, `loading`                                    |
+| `AppDialog`                               | Reka UI `Dialog`                          | 포커스 트랩, ESC, 스크롤 잠금                                                               |
+| `ConfirmDialog`                           | Reka UI `AlertDialog`                     | 확인/닫기, 기본 포커스는 닫기                                                               |
+| `AppSelect`                               | Reka UI `Select`                          | 학생 선택, 시간 선택                                                                        |
+| `AppNumberField`                          | Reka UI `NumberField`                     | 최대 인원                                                                                   |
+| 날짜 입력 (`AppInput type="date"`)        | 네이티브 `<input type="date">`            | 운영 기간 날짜. 모바일 기본 피커·키보드 입력을 그대로 쓰기 위해 Reka `DatePicker` 대신 사용 |
+| 시각 선택 (`AppSelect`)                   | `AppSelect` (30분 단위 `halfHourSlots()`) | 운영·방문 시각. 선택지를 30분 단위로 제한                                                   |
+| `AppTabs`                                 | Reka UI `Tabs`                            | 목록 필터, 상세 탭                                                                          |
+| `AppToast`                                | Reka UI `Toast`                           | 성공·에러 알림, `aria-live`                                                                 |
+| `AppTooltip`                              | Reka UI `Tooltip`                         | 비활성 버튼 이유                                                                            |
+| `AppDropdownMenu`                         | Reka UI `DropdownMenu`                    | 카드 `[⋯]` 메뉴                                                                             |
+| `AppBadge`                                | 자체 + `cva`                              | 상태 배지 (tone: open/warn/full/applied/canceled/ended)                                     |
+| `FormField`                               | 자체                                      | label + control + hint/error, id 자동 연결                                                  |
+| `AppInput`                                | 자체                                      | 텍스트·날짜·검색 입력 (`controlClass` 공용)                                                 |
+| `AppAlert`                                | 자체                                      | 폼·다이얼로그 상단 에러 안내 (`role="alert"`)                                               |
+| `AppSkeleton`, `EmptyState`, `ErrorState` | 자체                                      | 5종 상태 표준화                                                                             |
 
 ### `components/domain` — 도메인 전용
 

@@ -90,3 +90,28 @@ export function getRoomPhase(
   if (t >= new Date(room.endDate).getTime()) return 'ended';
   return 'open';
 }
+
+/** `<input type="date">` 값 (로컬 기준 `YYYY-MM-DD`) */
+export function toDateInputValue(value: DateInput): string {
+  const d = toDate(value);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** 시간 선택 값 (`HH:mm`) */
+export function toTimeValue(value: DateInput): string {
+  return formatTime(value);
+}
+
+/** `YYYY-MM-DD` + `HH:mm` → 로컬 Date. 형식이 틀리면 null */
+export function combineDateTime(date: string, time: string): Date | null {
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const tm = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!dm || !tm) return null;
+  const d = new Date(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3]), Number(tm[1]), Number(tm[2]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** 하루를 30분 단위로 나눈 `HH:mm` 목록 (00:00 ~ 23:30) */
+export function halfHourSlots(): string[] {
+  return Array.from({ length: 48 }, (_, i) => `${pad(Math.floor(i / 2))}:${i % 2 ? '30' : '00'}`);
+}
