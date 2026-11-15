@@ -3,17 +3,20 @@ import { ToastClose, ToastDescription, ToastProvider, ToastRoot, ToastViewport }
 import { CircleAlert, CircleCheck, X } from 'lucide-vue-next';
 import { useToast } from '@/composables/useToast';
 
-/** 전역 토스트. App.vue에 하나만 둔다. 에러는 assertive로 알린다. */
+/**
+ * 전역 토스트. App.vue에 하나만 둔다. 에러는 assertive로 알린다.
+ * 화면 가운데 아래에 쌓이며(새 알림이 아래), 여러 개가 와도 모두 보인다.
+ */
 const { toasts, dismiss } = useToast();
 </script>
 
 <template>
-  <ToastProvider label="알림" :duration="4000" swipe-direction="right">
+  <ToastProvider label="알림" :duration="4000" swipe-direction="down">
     <ToastRoot
       v-for="toast in toasts"
       :key="toast.id"
       :type="toast.tone === 'error' ? 'foreground' : 'background'"
-      class="flex items-start gap-3 rounded-lg bg-grey-800 p-3.5 pr-2 text-white shadow-overlay data-[state=closed]:animate-fade-out data-[state=open]:animate-dialog-in data-[swipe=end]:animate-fade-out"
+      class="flex w-full items-start gap-3 rounded-lg bg-grey-800 p-3.5 pr-2 text-white shadow-overlay data-[state=closed]:animate-fade-out data-[state=open]:animate-dialog-in data-[swipe=end]:animate-fade-out"
       @update:open="(open: boolean) => !open && dismiss(toast.id)"
     >
       <CircleCheck
@@ -33,7 +36,7 @@ const { toasts, dismiss } = useToast();
     <!-- 기본 이름이 영어(Notifications (F8))라 스크린 리더용으로 한국어 이름을 준다 -->
     <ToastViewport
       label="알림 ({hotkey})"
-      class="fixed right-0 bottom-0 z-50 m-0 flex w-full max-w-sm list-none flex-col gap-2 p-4 outline-none"
+      class="fixed inset-x-0 bottom-0 z-50 mx-auto my-0 flex w-full max-w-lg list-none flex-col items-center gap-2 p-4 outline-none sm:pb-6"
     />
   </ToastProvider>
 </template>

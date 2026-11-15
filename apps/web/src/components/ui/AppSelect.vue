@@ -11,7 +11,7 @@ import {
   SelectValue,
   SelectViewport,
 } from 'reka-ui';
-import type { HTMLAttributes } from 'vue';
+import { computed, type HTMLAttributes } from 'vue';
 import { Check, ChevronDown } from 'lucide-vue-next';
 import { cn } from '@/utils/cn';
 import { controlClass } from './variants';
@@ -38,6 +38,8 @@ const props = defineProps<{
   /** 트리거 버튼에 붙는 클래스 (너비 등) */
   class?: HTMLAttributes['class'];
 }>();
+
+const selected = computed(() => props.options.find((o) => o.value === model.value));
 </script>
 
 <template>
@@ -55,7 +57,16 @@ const props = defineProps<{
       :aria-describedby="props.describedby"
       :aria-label="props.ariaLabel"
     >
-      <SelectValue :placeholder="props.placeholder" class="truncate" />
+      <SelectValue :placeholder="props.placeholder" class="flex min-w-0 items-center gap-2">
+        <!-- 고른 뒤에도 보조 정보(예: 번호 뒷자리)를 보여 동명이인을 구분할 수 있게 한다 -->
+        <template v-if="selected">
+          <span class="truncate">{{ selected.label }}</span>
+          <span v-if="selected.hint" class="shrink-0 text-caption text-fg-subtle tabular-nums">
+            {{ selected.hint }}
+          </span>
+        </template>
+        <template v-else>{{ props.placeholder }}</template>
+      </SelectValue>
       <SelectIcon as-child>
         <ChevronDown class="size-4 shrink-0 text-fg-muted" aria-hidden="true" />
       </SelectIcon>

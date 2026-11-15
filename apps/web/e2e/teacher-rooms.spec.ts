@@ -58,9 +58,9 @@ test.describe('강사 · 자습실 수정', () => {
 
     const dialog = page.getByRole('dialog', { name: '자습실 수정' });
     await expect(dialog.getByText('현재 2명이 신청했어요')).toBeVisible();
+    // 포커스를 벗어나지 않아도 입력하는 즉시 안내한다 (#26)
     await dialog.getByLabel('최대 인원').fill('1');
-    // 숫자 필드는 포커스를 벗어날 때 값을 확정한다 (#26 개선 후보: 입력 즉시 반영)
-    await dialog.getByLabel('최대 인원').press('Tab');
+    await expect(dialog.getByLabel('최대 인원')).toBeFocused();
     await expect(dialog.getByText('현재 2명이 신청했어요. 2명 이상으로 정해 주세요')).toBeVisible();
     await dialog.getByRole('button', { name: '저장' }).click();
     await expect(dialog).toBeVisible();

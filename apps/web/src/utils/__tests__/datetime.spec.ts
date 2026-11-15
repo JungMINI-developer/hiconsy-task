@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatDate,
+  formatDuration,
   formatDateTime,
   formatRange,
   formatTimestamp,
   getRoomPhase,
+  shiftEndWithStart,
   toIsoWithOffset,
 } from '../datetime';
 
@@ -54,5 +56,36 @@ describe('datetime', () => {
     expect(getRoomPhase(room, new Date('2026-11-15T08:59:59+09:00'))).toBe('upcoming');
     expect(getRoomPhase(room, new Date('2026-11-15T09:00:00+09:00'))).toBe('open');
     expect(getRoomPhase(room, new Date('2026-11-15T12:00:00+09:00'))).toBe('ended');
+  });
+
+  it('시작을 옮기면 종료도 같은 간격만큼 옮긴다', () => {
+    const start = new Date('2026-11-17T18:00:00+09:00');
+    const end = new Date('2026-11-17T22:00:00+09:00');
+    expect(shiftEndWithStart(start, new Date('2026-11-20T18:00:00+09:00'), end)).toEqual(
+      new Date('2026-11-20T22:00:00+09:00'),
+    );
+    expect(shiftEndWithStart(start, new Date('2026-11-17T19:30:00+09:00'), end)).toEqual(
+      new Date('2026-11-17T23:30:00+09:00'),
+    );
+    // 이미 시작 ≥ 종료였다면 건드리지 않는다
+    expect(shiftEndWithStart(end, start, start)).toBeNull();
+  });
+
+  it('어제·오늘·내일은 상대 표기를 쓴다', () => {
+    expect(formatDate('2026-11-15T23:30:00+09:00', now)).toBe('오늘');
+    expect(formatDate('2026-11-16T00:10:00+09:00', now)).toBe('내일');
+    expect(formatDate('2026-11-14T09:00:00+09:00', now)).toBe('어제');
+    expect(formatDate('2026-11-17T09:00:00+09:00', now)).toBe('11.17(화)');
+    expect(formatRange('2026-11-15T20:00:00+09:00', '2026-11-15T22:00:00+09:00', now)).toBe(
+      '오늘 20:00 – 22:00',
+    );
+  });
+
+  it('구간 길이를 시간·분으로 표기한다', () => {
+    expect(formatDuration('2026-11-20T18:00:00+09:00', '2026-11-20T20:00:00+09:00')).toBe('2시간');
+    expect(formatDuration('2026-11-20T18:00:00+09:00', '2026-11-20T19:30:00+09:00')).toBe(
+      '1시간 30분',
+    );
+    expect(formatDuration('2026-11-20T18:00:00+09:00', '2026-11-20T18:30:00+09:00')).toBe('30분');
   });
 });

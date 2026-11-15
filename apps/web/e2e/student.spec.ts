@@ -135,7 +135,8 @@ test.describe('학생 · 키보드만으로', () => {
     await page.keyboard.press('Enter');
 
     const dialog = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
-    await expect(dialog.getByRole('combobox', { name: '날짜' })).toBeFocused();
+    // 하루만 운영하는 자습실은 날짜를 고를 필요가 없어 시작 시각으로 바로 포커스
+    await expect(dialog.getByRole('combobox', { name: '방문 시작 시각' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
     await expect(page).toHaveURL('/student/rooms');

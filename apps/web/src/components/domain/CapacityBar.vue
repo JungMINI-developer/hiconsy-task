@@ -3,8 +3,10 @@ import { computed } from 'vue';
 import { cn } from '@/utils/cn';
 
 /**
- * 신청/정원 막대 + 숫자. 80% 이상 주의색, 100% 마감색.
- * 숫자를 항상 함께 보여 색만으로 상태를 전달하지 않는다.
+ * 정원 막대 + 숫자. 숫자를 항상 함께 보여 색만으로 상태를 전달하지 않는다.
+ * - 강사: 신청 인원만큼 찬다 (80% 이상 주의색, 100% 마감색)
+ * - 학생: 남은 자리만큼 찬다 — 라벨 "남은 자리 n"과 막대가 같은 방향으로 읽히게
+ *   (남은 자리가 20% 이하면 주의색, 0이면 마감색 글자)
  */
 const props = withDefaults(
   defineProps<{
@@ -16,9 +18,18 @@ const props = withDefaults(
   { perspective: 'teacher' },
 );
 
-const ratio = computed(() => (props.max > 0 ? Math.min(props.current / props.max, 1) : 0));
-const level = computed(() => (ratio.value >= 1 ? 'full' : ratio.value >= 0.8 ? 'warn' : 'open'));
 const remaining = computed(() => Math.max(props.max - props.current, 0));
+/** 신청 비율 (0~1) — 상태색 기준 */
+const taken = computed(() => (props.max > 0 ? Math.min(props.current / props.max, 1) : 0));
+const level = computed(() => (taken.value >= 1 ? 'full' : taken.value >= 0.8 ? 'warn' : 'open'));
+/** 막대 길이: 강사는 신청 비율, 학생은 남은 비율 */
+const ratio = computed(() => {
+  if (props.max <= 0) return 0;
+  return props.perspective === 'student' ? remaining.value / props.max : taken.value;
+});
+const meterValue = computed(() =>
+  props.perspective === 'student' ? remaining.value : props.current,
+);
 
 const fillClass = {
   open: 'bg-status-open',
@@ -37,7 +48,7 @@ const label = computed(() =>
   <div class="flex items-center gap-3">
     <div
       role="meter"
-      :aria-valuenow="current"
+      :aria-valuenow="meterValue"
       aria-valuemin="0"
       :aria-valuemax="max"
       :aria-valuetext="label"

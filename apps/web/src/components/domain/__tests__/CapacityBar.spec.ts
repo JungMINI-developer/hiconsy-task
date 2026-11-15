@@ -27,4 +27,20 @@ describe('CapacityBar', () => {
     expect(meter.attributes('aria-valuenow')).toBe('3');
     expect(meter.attributes('aria-valuemax')).toBe('5');
   });
+
+  it('학생 화면은 남은 자리만큼 막대가 차고, 적게 남으면 주의색', () => {
+    const bar = (current: number) =>
+      mount(CapacityBar, { props: { current, max: 10, perspective: 'student' } }).find(
+        '[role="meter"] > div',
+      );
+    expect(bar(2).attributes('style')).toContain('width: 80%');
+    expect(bar(2).classes()).toContain('bg-status-open');
+    expect(bar(8).attributes('style')).toContain('width: 20%');
+    expect(bar(8).classes()).toContain('bg-status-warn');
+    expect(
+      mount(CapacityBar, { props: { current: 8, max: 10, perspective: 'student' } })
+        .find('[role="meter"]')
+        .attributes('aria-valuenow'),
+    ).toBe('2');
+  });
 });

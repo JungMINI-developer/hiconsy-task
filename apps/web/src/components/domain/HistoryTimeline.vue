@@ -2,6 +2,8 @@
 import type { StudyRoomHistory } from '@hiconsy/shared';
 import { cn } from '@/utils/cn';
 import { formatRange, formatTimestamp } from '@/utils/datetime';
+import AppBadge from '@/components/ui/AppBadge.vue';
+import type { BadgeVariants } from '@/components/ui/variants';
 
 /**
  * 방문 신청·변경·취소 이력 타임라인 (최신이 위).
@@ -17,6 +19,13 @@ withDefaults(
 );
 
 const ACTION_LABEL = { APPLY: '신청', UPDATE: '시간 변경', CANCEL: '취소' } as const;
+
+/** 훑어볼 때 종류가 먼저 보이도록 배지 색을 나눈다 (글자 라벨이 있어 색만으로 구분하지 않음) */
+function actionTone(h: StudyRoomHistory): BadgeVariants['tone'] {
+  if (h.action === 'APPLY') return 'applied';
+  if (h.action === 'UPDATE') return 'neutral';
+  return h.actorType === 'SYSTEM' ? 'full' : 'canceled';
+}
 
 function actionLabel(h: StudyRoomHistory) {
   return h.action === 'CANCEL' && h.actorType === 'SYSTEM' ? '자동 취소' : ACTION_LABEL[h.action];
@@ -55,9 +64,9 @@ const ACTOR_NOTE = { SYSTEM: '시스템 처리', INSTRUCTOR: '강사 처리', ST
         <div class="min-w-0 text-body">
           <p>
             <span v-if="showStudent" class="mr-2 font-medium">{{ h.student.name }}</span>
-            <span :class="cn('mr-2', h.action === 'CANCEL' && 'text-fg-muted')">
+            <AppBadge :tone="actionTone(h)" class="mr-2 align-middle">
               {{ actionLabel(h) }}
-            </span>
+            </AppBadge>
             <span class="tabular-nums">
               <template v-if="h.action === 'UPDATE' && h.prevStartAt && h.prevEndAt">
                 <del class="text-fg-muted">{{ visitRange(h.prevStartAt, h.prevEndAt) }}</del>

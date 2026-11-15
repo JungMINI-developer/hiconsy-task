@@ -282,13 +282,15 @@ weak 스타일 하나만 씁니다: 같은 색 계열의 50 바탕 + 진한 글�
 
 ### Toast (`AppToaster`)
 
-grey800 바탕 + 흰 글자, 모서리 14px, 오른쪽 아래. 성공은 green500 아이콘, 에러는 assertive로 읽힙니다.
+grey800 바탕 + 흰 글자, 모서리 14px. **화면 가운데 아래**(본문과 같은 축)에 최대 폭 512px로 뜨고, 여러 개가 오면 새 알림이 아래로 쌓여 모두 보입니다(4초 후 사라짐, 아래로 밀어 닫기). 성공은 green500 아이콘, 에러는 assertive로 읽힙니다.
 
 ### Tabs · Capacity · Timeline
 
 - 탭: 밑줄형, 활성은 grey900 글자 + 2px 밑줄. 개수는 데이터를 불러온 뒤에만 표시.
-- 정원 막대(`CapacityBar`): 8px 높이 트랙(grey100), 80% 이상 orange500, 100% red700, 숫자 항상 병기, `role="meter"`.
-- 이력(`HistoryTimeline`): 점 색으로 종류 구분 + 텍스트 라벨, 시간 변경은 `<del>이전</del> → 이후`.
+- 정원 막대(`CapacityBar`): 8px 높이 트랙(grey100), 숫자 항상 병기, `role="meter"`.
+  - 강사: **신청 인원**만큼 찹니다. 80% 이상 orange500, 100% red700.
+  - 학생: **남은 자리**만큼 찹니다(라벨 "남은 자리 n"과 같은 방향). 남은 자리가 20% 이하면 orange500, 0이면 빈 막대 + red700 글자.
+- 이력(`HistoryTimeline`): 동작을 배지로 표시 — 신청 applied(파랑), 시간 변경 neutral, 취소 canceled, 자동 취소 full(빨강). 시간 변경은 `<del>이전</del> → 이후`.
 
 ### States
 
@@ -326,6 +328,8 @@ grey800 바탕 + 흰 글자, 모서리 14px, 오른쪽 아래. 성공은 green50
 - `word-break: keep-all` — 한글을 음절이 아니라 띄어쓰기 단위로 줄바꿈 ("주말 특/강" 방지). 긴 단어는 `overflow-wrap: anywhere`로만 끊습니다.
 - 제목은 `text-wrap: balance`, 문단·목록은 `text-wrap: pretty` (문장 끝 한 글자가 떨어지는 것 방지).
 - 구간 구분자는 앞뒤 공백이 있는 en dash(`18:00 – 20:00`).
+- 어제·오늘·내일은 날짜 대신 상대 표기(`오늘 20:00 – 22:00`).
+- `scrollbar-gutter: stable` — 목록이 길어져 스크롤바가 생겨도 본문이 좌우로 흔들리지 않습니다.
 
 ## Agent Prompt Guide
 
