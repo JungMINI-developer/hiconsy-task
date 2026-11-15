@@ -88,8 +88,8 @@ pnpm typecheck   # 타입 체크
 
 ```bash
 pnpm --filter @hiconsy/web exec playwright install chromium   # 처음 한 번 (약 100MB)
-pnpm --filter @hiconsy/web test:e2e        # 데스크톱(1280) + 모바일(320) 두 폭
-pnpm --filter @hiconsy/web test:e2e:ui     # 단계별로 보며 실행 (UI 모드)
+pnpm test:e2e:ui                            # 루트에서 UI 모드로 열기 — 단계별로 보며 실행
+pnpm --filter @hiconsy/web test:e2e         # 웹 E2E만 실행 (데스크톱 1280 + 모바일 320)
 ```
 
 - API(3100)·웹(5174) 서버를 테스트가 직접 띄우므로, 개발 서버(3000/5173)를 켜 둔 채로 돌려도 겹치지 않습니다.

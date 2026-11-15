@@ -17,6 +17,7 @@
     "db:migrate": "pnpm --filter @hiconsy/api prisma:migrate",
     "prepare": "husky",
     "test:e2e": "turbo run test:e2e",
+    "test:e2e:ui": "pnpm --filter @hiconsy/shared build && pnpm --filter @hiconsy/web test:e2e:ui",
     "db:seed": "pnpm --filter @hiconsy/api prisma:seed",
     "docker:up": "docker compose up --build -d",
     "docker:down": "docker compose down"
