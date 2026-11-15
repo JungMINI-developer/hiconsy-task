@@ -24,9 +24,19 @@ export function isSameDay(a: DateInput, b: DateInput): boolean {
   );
 }
 
-/** `11.20(목)`, 올해가 아니면 `2027.01.05(화)` */
+/** 두 시각의 달력 날짜 차이 (b - a, 로컬 기준) */
+function dayDiff(a: Date, b: Date): number {
+  const start = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return Math.round((start(b) - start(a)) / 86_400_000);
+}
+
+const RELATIVE_DAY: Record<number, string> = { [-1]: '어제', 0: '오늘', 1: '내일' };
+
+/** `오늘`·`내일`·`어제`, 그 밖엔 `11.20(목)`, 올해가 아니면 `2027.01.05(화)` */
 export function formatDate(value: DateInput, now: Date = new Date()): string {
   const d = toDate(value);
+  const relative = RELATIVE_DAY[dayDiff(now, d)];
+  if (relative) return relative;
   const md = `${pad(d.getMonth() + 1)}.${pad(d.getDate())}(${WEEKDAYS[d.getDay()]})`;
   return d.getFullYear() === now.getFullYear() ? md : `${d.getFullYear()}.${md}`;
 }
@@ -114,4 +124,22 @@ export function combineDateTime(date: string, time: string): Date | null {
 /** 하루를 30분 단위로 나눈 `HH:mm` 목록 (00:00 ~ 23:30) */
 export function halfHourSlots(): string[] {
   return Array.from({ length: 48 }, (_, i) => `${pad(Math.floor(i / 2))}:${i % 2 ? '30' : '00'}`);
+}
+
+/**
+ * 시작을 옮길 때 종료를 같은 간격만큼 옮긴다 (자습실 폼).
+ * 옮기기 전 구간이 올바르지 않았으면(시작 ≥ 종료) 그대로 둔다.
+ */
+export function shiftEndWithStart(prevStart: Date, nextStart: Date, end: Date): Date | null {
+  if (end.getTime() <= prevStart.getTime()) return null;
+  return new Date(end.getTime() + (nextStart.getTime() - prevStart.getTime()));
+}
+
+/** 구간 길이: `2시간`, `1시간 30분`, `30분` */
+export function formatDuration(start: DateInput, end: DateInput): string {
+  const minutes = Math.round((toDate(end).getTime() - toDate(start).getTime()) / 60_000);
+  if (minutes <= 0) return '';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return [h ? `${h}시간` : '', m ? `${m}분` : ''].filter(Boolean).join(' ');
 }

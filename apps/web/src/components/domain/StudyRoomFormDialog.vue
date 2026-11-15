@@ -7,6 +7,7 @@ import { AppError } from '@/api/client';
 import {
   combineDateTime,
   halfHourSlots,
+  shiftEndWithStart,
   toDateInputValue,
   toIsoWithOffset,
   toTimeValue,
@@ -103,6 +104,26 @@ watch(
     serverFieldErrors.value = {};
   },
 );
+
+/**
+ * 운영 시작을 바꾸면 종료도 같은 간격만큼 옮긴다.
+ * (시작 날짜만 미루고 종료를 잊어 "종료가 시작보다 앞서는" 실수를 막는다)
+ */
+function moveStart(next: { date?: string; time?: string }) {
+  const prevStart = combineDateTime(values.startDate, values.startTime);
+  if (next.date !== undefined) values.startDate = next.date;
+  if (next.time !== undefined) {
+    values.startTime = next.time;
+    touched.start = true;
+  }
+  const nextStart = combineDateTime(values.startDate, values.startTime);
+  const end = combineDateTime(values.endDate, values.endTime);
+  if (!prevStart || !nextStart || !end) return;
+  const shifted = shiftEndWithStart(prevStart, nextStart, end);
+  if (!shifted) return;
+  values.endDate = toDateInputValue(shifted);
+  values.endTime = toTimeValue(shifted);
+}
 
 const clientErrors = computed(() =>
   validateStudyRoomForm(values, isEdit.value ? currentPersonnel.value : 0),
@@ -243,19 +264,21 @@ async function handleError(e: unknown) {
         <div class="flex flex-wrap gap-2">
           <AppInput
             :id="id"
-            v-model="values.startDate"
+            :model-value="values.startDate"
             type="date"
             class="min-w-40 flex-1"
             :invalid="invalid"
             :aria-describedby="describedby"
+            @update:model-value="(v) => moveStart({ date: String(v ?? '') })"
             @blur="touched.start = true"
           />
           <AppSelect
-            v-model="values.startTime"
+            :model-value="values.startTime"
             :options="timeOptions"
             class="w-28"
             aria-label="운영 시작 시각"
-            @update:model-value="touched.start = true"
+            open-below
+            @update:model-value="(v) => moveStart({ time: v })"
           />
         </div>
       </FormField>
@@ -282,6 +305,7 @@ async function handleError(e: unknown) {
             :options="timeOptions"
             class="w-28"
             aria-label="운영 종료 시각"
+            open-below
             :invalid="invalid"
             @update:model-value="touched.end = true"
           />

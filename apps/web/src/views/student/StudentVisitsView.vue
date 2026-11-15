@@ -211,34 +211,36 @@ async function confirmCancel() {
           "
         >
           <div class="flex items-start justify-between gap-3">
-            <h2 :class="cn('text-heading', tab !== 'upcoming' && 'text-fg-muted')">
-              {{ visit.studyRoom.name }}
-            </h2>
+            <!-- 가장 중요한 건 "언제 가는지" — 방문 시간을 크게, 자습실 이름은 위에 작게 -->
+            <div class="min-w-0">
+              <h2 class="text-label text-fg-muted">{{ visit.studyRoom.name }}</h2>
+              <p
+                :class="
+                  cn(
+                    'mt-0.5 text-heading tabular-nums',
+                    tab !== 'upcoming' && 'text-fg-muted',
+                    tab === 'canceled' && 'line-through decoration-1',
+                  )
+                "
+              >
+                <span class="sr-only">방문 </span>{{ visitText(visit) }}
+              </p>
+            </div>
             <AppBadge v-if="tab === 'canceled'" tone="canceled">취소됨</AppBadge>
             <AppBadge v-else-if="tab === 'past'" tone="ended">지난 방문</AppBadge>
             <AppBadge v-else-if="isStarted(visit)" tone="open">방문 중</AppBadge>
             <AppBadge v-else tone="applied">신청됨</AppBadge>
           </div>
 
-          <dl class="flex flex-col gap-1 text-body">
-            <div class="flex gap-3">
-              <dt class="w-10 shrink-0 text-fg-muted">방문</dt>
-              <dd class="tabular-nums">{{ visitText(visit) }}</dd>
-            </div>
-            <div class="flex gap-3">
-              <dt class="w-10 shrink-0 text-fg-muted">신청</dt>
-              <dd class="tabular-nums">{{ formatDate(visit.createdAt) }}</dd>
-            </div>
-            <div v-if="visit.status === 'CANCELED' && visit.canceledAt" class="flex gap-3">
-              <dt class="w-10 shrink-0 text-fg-muted">취소</dt>
-              <dd>
-                <span class="tabular-nums">{{ formatDate(visit.canceledAt) }}</span>
-                <span v-if="visit.studyRoom.deleted" class="text-fg-muted">
-                  · 자습실이 삭제되어 자동으로 취소됐어요
-                </span>
-              </dd>
-            </div>
-          </dl>
+          <p class="text-caption text-fg-muted tabular-nums">
+            신청 {{ formatDate(visit.createdAt) }}
+            <template v-if="visit.status === 'CANCELED' && visit.canceledAt">
+              · 취소 {{ formatDate(visit.canceledAt) }}
+              <template v-if="visit.studyRoom.deleted">
+                · 자습실이 삭제되어 자동으로 취소됐어요
+              </template>
+            </template>
+          </p>
 
           <div
             v-if="tab === 'upcoming' || (tab === 'canceled' && reapplyRoom(visit))"

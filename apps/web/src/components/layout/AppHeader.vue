@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
 import { ArrowLeftRight, CalendarCheck, DoorOpen, Users } from 'lucide-vue-next';
 import { useSessionStore } from '@/stores/session';
 
@@ -18,8 +18,12 @@ const props = defineProps<{
 }>();
 
 const session = useSessionStore();
+const route = useRoute();
+/** 역할을 고르는 중에는 이전 역할의 메뉴·이름을 보이지 않는다 (어느 역할인지 헷갈리지 않게) */
+const choosingRole = computed(() => route.name === 'role-select');
 
 const nav = computed<NavItem[]>(() => {
+  if (choosingRole.value) return [];
   if (session.isTeacher) {
     return [
       { to: '/teacher/rooms', label: '자습실', icon: DoorOpen },
@@ -40,7 +44,10 @@ const nav = computed<NavItem[]>(() => {
   return [];
 });
 
-const who = computed(() => (session.isTeacher ? '강사' : (session.student?.name ?? '')));
+const who = computed(() => {
+  if (choosingRole.value) return '';
+  return session.isTeacher ? '강사' : (session.student?.name ?? '');
+});
 const home = computed(() => nav.value[0]?.to ?? '/');
 </script>
 

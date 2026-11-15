@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import type { StudyRoom } from '@hiconsy/shared';
 import { Plus } from 'lucide-vue-next';
 import { studyRoomsApi } from '@/api/studyRooms';
 import { useAsync } from '@/composables/useAsync';
 import { useDialogQuery } from '@/composables/useDialogQuery';
-import { useHighlight, useRefetchOnVisible } from '@/composables/useRefetch';
+import { scrollToItem, useHighlight, useRefetchOnVisible } from '@/composables/useRefetch';
 import { useToast } from '@/composables/useToast';
 import { getRoomPhase } from '@/utils/datetime';
 import { errorMessage } from '@/utils/errorMessage';
@@ -74,8 +74,12 @@ const editOpen = computed({
 function onSaved(room: StudyRoom, mode: 'create' | 'edit') {
   toast.success(mode === 'create' ? '자습실을 열었어요' : '변경 내용을 저장했어요');
   if (mode === 'create') tab.value = getRoomPhase(room) === 'ended' ? 'ended' : 'active';
-  highlight(room.id);
-  void rooms.run();
+  // 목록을 다시 받은 뒤 그 카드로 스크롤하고 강조한다 (목록 끝에 생겨 화면 밖일 수 있음)
+  void rooms.run().then(async () => {
+    await nextTick();
+    scrollToItem(`[data-room-id="${room.id}"]`);
+    highlight(room.id);
+  });
 }
 
 function onGone() {
@@ -168,7 +172,7 @@ const menuItems = [
         </AppButton>
       </EmptyState>
       <ul v-else class="grid gap-3 lg:grid-cols-2">
-        <li v-for="room in visible" :key="room.id">
+        <li v-for="room in visible" :key="room.id" :data-room-id="room.id">
           <StudyRoomCard
             :room="room"
             :to="{ name: 'teacher-room', params: { id: room.id } }"

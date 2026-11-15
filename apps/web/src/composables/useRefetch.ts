@@ -26,3 +26,11 @@ export function useHighlight(durationMs = 1200) {
   onBeforeUnmount(() => clearTimeout(timer));
   return { highlightedId, highlight };
 }
+
+/** 바뀐 항목을 화면 안으로 스크롤한다 (목록 끝에 추가되어 보이지 않는 경우) */
+export function scrollToItem(selector: string) {
+  const el = document.querySelector<HTMLElement>(selector);
+  if (!el) return;
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+}

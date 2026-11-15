@@ -9,6 +9,7 @@ import { useToast } from '@/composables/useToast';
 import { useSessionStore } from '@/stores/session';
 import {
   formatDate,
+  formatDuration,
   formatRange,
   formatTimeRange,
   toDateInputValue,
@@ -131,6 +132,11 @@ const selected = computed(() => {
   return s && e ? { startAt: s, endAt: e } : null;
 });
 
+/** 고른 방문 길이 (예: 2시간) */
+const duration = computed(() =>
+  selected.value ? formatDuration(selected.value.startAt, selected.value.endAt) : '',
+);
+
 const unchanged = computed(
   () =>
     !!props.visit &&
@@ -220,9 +226,14 @@ function handleError(e: unknown) {
       </p>
 
       <template v-else>
-        <FormField id="visit-date" v-slot="{ id }" label="날짜">
+        <!-- 고를 수 있는 날짜가 하루뿐이면 드롭다운 대신 그 날짜를 보여준다 -->
+        <FormField v-if="dateOptions.length > 1" id="visit-date" v-slot="{ id }" label="날짜">
           <AppSelect :id="id" v-model="date" :options="dateOptions" />
         </FormField>
+        <div v-else class="flex flex-col gap-1.5">
+          <p class="text-label">날짜</p>
+          <p class="text-body tabular-nums">{{ dateOptions[0]?.label }}</p>
+        </div>
 
         <fieldset class="flex flex-col gap-1.5">
           <legend class="mb-1.5 text-label">방문 시간</legend>
@@ -231,6 +242,7 @@ function handleError(e: unknown) {
               v-model="start"
               :options="startOptions"
               aria-label="방문 시작 시각"
+              open-below
               class="flex-1"
             />
             <span class="text-fg-muted" aria-hidden="true">–</span>
@@ -238,10 +250,15 @@ function handleError(e: unknown) {
               v-model="end"
               :options="endOptions"
               aria-label="방문 종료 시각"
+              open-below
               class="flex-1"
             />
           </div>
-          <p class="text-caption text-fg-muted">30분 단위로, 운영 기간 안에서만 고를 수 있어요</p>
+          <p class="text-caption text-fg-muted">
+            <span v-if="duration" class="font-semibold text-fg">{{ duration }}</span>
+            <span v-if="duration" aria-hidden="true"> · </span>
+            30분 단위로, 운영 기간 안에서만 고를 수 있어요
+          </p>
         </fieldset>
 
         <p v-if="!isEdit && remaining !== undefined" class="text-body">

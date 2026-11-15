@@ -20,6 +20,16 @@ defineProps<{
   unit?: string;
 }>();
 
+/**
+ * Reka NumberField는 포커스를 벗어날 때(또는 Enter) 값을 확정한다.
+ * 정원 검사처럼 입력하는 즉시 안내해야 하므로, 타이핑 중인 값도 숫자면 바로 반영한다.
+ */
+function onTyping(event: Event) {
+  const raw = (event.target as HTMLInputElement).value.trim();
+  if (raw === '') model.value = null;
+  else if (/^\d+$/.test(raw)) model.value = Number(raw);
+}
+
 const stepButton =
   'inline-flex size-11 shrink-0 items-center justify-center text-fg-muted hover:bg-sunken hover:text-fg disabled:cursor-not-allowed disabled:opacity-40';
 </script>
@@ -39,6 +49,8 @@ const stepButton =
       </NumberFieldDecrement>
       <NumberFieldInput
         :id="id"
+        inputmode="numeric"
+        @input="onTyping"
         :aria-invalid="invalid || undefined"
         :aria-describedby="describedby"
         class="h-full w-16 border-x border-line bg-transparent text-center text-body tabular-nums focus:outline-none"
