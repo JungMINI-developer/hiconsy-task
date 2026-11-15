@@ -44,4 +44,4 @@ export type BadgeVariants = VariantProps<typeof badgeVariants>;
 
 /** 입력 컨트롤 공통 (input, select trigger) */
 export const controlClass =
-  'h-10 w-full rounded-md border border-line-strong bg-surface px-3 text-body text-fg transition-colors duration-120 ease-standard placeholder:text-fg-muted hover:border-fg-muted aria-invalid:border-status-danger disabled:cursor-not-allowed disabled:bg-sunken disabled:text-fg-muted';
+  'h-10 w-full rounded-md border border-line-input bg-surface px-3 text-body text-fg transition-colors duration-120 ease-standard placeholder:text-fg-muted hover:border-fg-muted aria-invalid:border-status-danger disabled:cursor-not-allowed disabled:bg-sunken disabled:text-fg-muted';

@@ -12,6 +12,19 @@
 
 요구사항(FR), 기능 정의(FN), 필수 엔티티 원문 정리: [docs/requirements.md](./docs/requirements.md)
 
+### 화면
+
+| 강사 · 자습실 목록                                   | 강사 · 자습실 상세 (이력)                                        |
+| ---------------------------------------------------- | ---------------------------------------------------------------- |
+| ![강사 자습실 목록](./docs/images/teacher-rooms.jpg) | ![강사 자습실 상세 이력](./docs/images/teacher-room-history.jpg) |
+| **학생 · 방문 신청**                                 | **학생 · 내 신청 (취소됨)**                                      |
+| ![학생 방문 신청](./docs/images/student-apply.jpg)   | ![학생 내 신청](./docs/images/student-visits.jpg)                |
+
+- 정원(`7 / 10명`, 학생은 `남은 자리`)과 내 신청 여부를 목록 카드에서 바로 보여줍니다.
+- 방문 시간은 운영 기간 안·현재 이후의 30분 단위 선택지만 고를 수 있습니다.
+- 시스템이 취소한 신청(자습실 삭제)은 학생의 취소됨 탭에 사유와 함께 남습니다.
+- 디자인 원칙과 실제 토큰·대비 측정 결과: [apps/web/DESIGN.md](./apps/web/DESIGN.md)
+
 > TODO: 구현 범위(필수/선택 FR) 및 직접 정한 규칙 요약
 
 ## 목차
@@ -112,13 +125,13 @@ Docker 전체 실행(방법 A)에서는 api 컨테이너의 `DATABASE_URL`이 �
 
 ## 2. 기술 스택 및 선택 이유
 
-| 영역      | 기술                                                                     |
-| --------- | ------------------------------------------------------------------------ |
-| Frontend  | Vue 3 (Composition API), Vite, TypeScript, Vue Router, Pinia, Axios      |
-| Backend   | NestJS 12, Prisma 7, PostgreSQL 16, Swagger, class-validator             |
-| 공통      | pnpm workspace, Turborepo, TypeScript, Vitest                            |
-| 품질 관리 | ESLint, oxlint, Prettier, husky, commitlint, lint-staged, GitHub Actions |
-| 인프라    | Docker, Docker Compose, nginx                                            |
+| 영역      | 기술                                                                                          |
+| --------- | --------------------------------------------------------------------------------------------- |
+| Frontend  | Vue 3 (Composition API), Vite, TypeScript, Vue Router, Pinia, Axios, Tailwind CSS v4, Reka UI |
+| Backend   | NestJS 12, Prisma 7, PostgreSQL 16, Swagger, class-validator                                  |
+| 공통      | pnpm workspace, Turborepo, TypeScript, Vitest                                                 |
+| 품질 관리 | ESLint, oxlint, Prettier, husky, commitlint, lint-staged, GitHub Actions                      |
+| 인프라    | Docker, Docker Compose, nginx                                                                 |
 
 자세한 선택 이유: [docs/tech-stack.md](./docs/tech-stack.md)
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue';
 import { RouterLink } from 'vue-router';
-import { CalendarCheck, DoorOpen, Users } from 'lucide-vue-next';
+import { ArrowLeftRight, CalendarCheck, DoorOpen, Users } from 'lucide-vue-next';
 import { useSessionStore } from '@/stores/session';
 
 interface NavItem {
@@ -47,14 +47,16 @@ const home = computed(() => nav.value[0]?.to ?? '/');
 <template>
   <header class="sticky top-0 z-30 border-b border-line bg-surface">
     <div class="mx-auto flex h-14 max-w-content items-center gap-2 px-4 sm:gap-6 sm:px-6">
-      <RouterLink :to="home" class="shrink-0 text-label font-semibold">자습실 예약</RouterLink>
+      <RouterLink :to="home" class="shrink-0 text-label font-semibold whitespace-nowrap">
+        자습실 예약
+      </RouterLink>
 
       <nav v-if="nav.length" aria-label="주 메뉴" class="flex h-full items-stretch gap-1">
         <RouterLink
           v-for="item in nav"
           :key="item.to"
           :to="item.to"
-          class="relative inline-flex items-center gap-1.5 px-2 text-label text-fg-muted transition-colors duration-120 ease-standard hover:text-fg aria-[current=page]:text-fg aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-2 aria-[current=page]:after:bottom-0 aria-[current=page]:after:h-0.5 aria-[current=page]:after:bg-fg sm:px-3"
+          class="relative inline-flex items-center gap-1.5 px-2 text-label whitespace-nowrap text-fg-muted transition-colors duration-120 ease-standard hover:text-fg aria-[current=page]:text-fg aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-2 aria-[current=page]:after:bottom-0 aria-[current=page]:after:h-0.5 aria-[current=page]:after:bg-fg sm:px-3"
         >
           <component :is="item.icon" class="size-4 sm:hidden" aria-hidden="true" />
           {{ item.label }}
@@ -62,7 +64,7 @@ const home = computed(() => nav.value[0]?.to ?? '/');
             v-if="item.count"
             class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-caption font-medium text-accent-fg tabular-nums"
           >
-            <span class="sr-only">유효 신청</span>{{ item.count }}<span class="sr-only">건</span>
+            <span class="sr-only">예정 방문</span>{{ item.count }}<span class="sr-only">건</span>
           </span>
         </RouterLink>
       </nav>
@@ -70,12 +72,14 @@ const home = computed(() => nav.value[0]?.to ?? '/');
       <div v-if="who" class="ml-auto flex shrink-0 items-center gap-2 text-label">
         <span class="hidden max-w-32 truncate sm:inline">{{ who }}</span>
         <span class="hidden text-line-strong sm:inline" aria-hidden="true">·</span>
+        <!-- 640px 미만에서는 아이콘만 보여 메뉴 라벨이 줄바꿈되지 않게 한다 -->
         <RouterLink
           to="/"
-          class="text-fg-muted underline-offset-4 hover:text-fg hover:underline"
+          class="inline-flex size-9 items-center justify-center rounded-md text-fg-muted hover:bg-sunken hover:text-fg sm:size-auto sm:rounded-none sm:underline-offset-4 sm:hover:bg-transparent sm:hover:underline"
           :aria-label="`${who}(으)로 보는 중. 역할 바꾸기`"
         >
-          역할 바꾸기
+          <ArrowLeftRight class="size-4 sm:hidden" aria-hidden="true" />
+          <span class="hidden whitespace-nowrap sm:inline">역할 바꾸기</span>
         </RouterLink>
       </div>
     </div>

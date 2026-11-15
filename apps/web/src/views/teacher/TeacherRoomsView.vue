@@ -43,10 +43,22 @@ const grouped = computed(() => {
   };
 });
 const visible = computed(() => grouped.value[tab.value]);
-const tabs = computed(() => [
-  { value: 'active' as const, label: '운영 중 · 예정', count: grouped.value.active.length },
-  { value: 'ended' as const, label: '종료', count: grouped.value.ended.length },
-]);
+// 불러오기 전·실패 시에는 개수를 숨긴다 (0개로 오해하지 않게)
+const tabs = computed(() => {
+  const loaded = !!rooms.data.value;
+  return [
+    {
+      value: 'active' as const,
+      label: '운영 중 · 예정',
+      count: loaded ? grouped.value.active.length : undefined,
+    },
+    {
+      value: 'ended' as const,
+      label: '종료',
+      count: loaded ? grouped.value.ended.length : undefined,
+    },
+  ];
+});
 
 // 등록·수정 다이얼로그 (URL 쿼리 ?new=1, ?edit=id)
 const createDialog = useDialogQuery('new');
