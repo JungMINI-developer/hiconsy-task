@@ -2,6 +2,11 @@
 import { RouterView } from 'vue-router';
 import AppHeader from '@/components/layout/AppHeader.vue';
 import AppToaster from '@/components/ui/AppToaster.vue';
+import { useMyVisitsStore } from '@/stores/myVisits';
+import { useSessionStore } from '@/stores/session';
+
+const session = useSessionStore();
+const myVisits = useMyVisitsStore();
 </script>
 
 <template>
@@ -11,7 +16,7 @@ import AppToaster from '@/components/ui/AppToaster.vue';
   >
     본문으로 건너뛰기
   </a>
-  <AppHeader />
+  <AppHeader :active-visit-count="session.isStudent ? myVisits.upcomingCount : undefined" />
   <div id="content">
     <RouterView />
   </div>
