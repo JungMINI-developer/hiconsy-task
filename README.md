@@ -79,12 +79,25 @@ pnpm dev                              # web + api 동시 실행 (hot reload)
 
 ```bash
 pnpm test        # 단위 테스트 (web, api)
-pnpm test:e2e    # API e2e 테스트 — pnpm db:up 필요, 테스트 전용 DB(hiconsy_test) 사용
+pnpm test:e2e    # API e2e + 웹 E2E — pnpm db:up 필요
 pnpm lint        # lint
 pnpm typecheck   # 타입 체크
 ```
 
-모든 PR에서 GitHub Actions로 lint, 타입 체크, 테스트, 빌드, e2e(PostgreSQL), Docker 빌드를 검증합니다.
+**웹 E2E (Playwright)** — 실제 브라우저에서 강사·학생 흐름을 버튼을 눌러 가며 확인합니다.
+
+```bash
+pnpm --filter @hiconsy/web exec playwright install chromium   # 처음 한 번 (약 100MB)
+pnpm test:e2e:ui                            # 루트에서 UI 모드로 열기 — 단계별로 보며 실행
+pnpm --filter @hiconsy/web test:e2e         # 웹 E2E만 실행 (데스크톱 1280 + 모바일 320)
+```
+
+- API(3100)·웹(5174) 서버를 테스트가 직접 띄우므로, 개발 서버(3000/5173)를 켜 둔 채로 돌려도 겹치지 않습니다.
+- 개발 DB와 분리된 `hiconsy_web_e2e` DB를 쓰고(없으면 자동 생성), 테스트마다 데이터를 비웁니다.
+- 실패하면 `apps/web/playwright-report`에 스크린샷과 trace가 남습니다 (`pnpm --filter @hiconsy/web exec playwright show-report`).
+- 시나리오: 역할 선택·권한 이동, 강사 자습실 등록·수정 거절·이력·삭제, 학생 관리, 학생 신청·시간 변경·취소·다시 신청, 정원 마감·동시 신청, 키보드 조작, 320px 가로 스크롤
+
+모든 PR에서 GitHub Actions로 lint, 타입 체크, 테스트, 빌드, API e2e(PostgreSQL), 웹 E2E(Playwright), Docker 빌드를 검증합니다.
 
 ### 환경변수
 
