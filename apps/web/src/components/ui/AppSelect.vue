@@ -11,6 +11,7 @@ import {
   SelectValue,
   SelectViewport,
 } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
 import { Check, ChevronDown } from 'lucide-vue-next';
 import { cn } from '@/utils/cn';
 import { controlClass } from './variants';
@@ -32,6 +33,10 @@ const props = defineProps<{
   disabled?: boolean;
   invalid?: boolean;
   describedby?: string;
+  /** 보이는 라벨이 없을 때의 접근 가능한 이름 */
+  ariaLabel?: string;
+  /** 트리거 버튼에 붙는 클래스 (너비 등) */
+  class?: HTMLAttributes['class'];
 }>();
 </script>
 
@@ -43,10 +48,12 @@ const props = defineProps<{
         cn(
           controlClass,
           'flex items-center justify-between gap-2 text-left data-placeholder:text-fg-muted',
+          props.class,
         )
       "
       :aria-invalid="props.invalid || undefined"
       :aria-describedby="props.describedby"
+      :aria-label="props.ariaLabel"
     >
       <SelectValue :placeholder="props.placeholder" class="truncate" />
       <SelectIcon as-child>
