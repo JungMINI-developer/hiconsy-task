@@ -4,8 +4,10 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /*
- * 디자인 토큰 — apps/web/docs/design-system.md
- * Tailwind 기본 팔레트·크기·모서리·그림자를 지우고 의미 토큰만 남긴다.
+ * 디자인 토큰 — apps/web/DESIGN.md
+ * 토스 디자인 시스템(TDS Mobile)의 공개 팔레트·타입 스케일을 참고했다.
+ * Tailwind 기본 팔레트·크기·모서리·그림자를 지우고, 스케일(grey-50 …) 위에 의미 토큰을 둔다.
+ * 컴포넌트는 의미 토큰(text-fg, bg-accent …)을 먼저 쓰고, 연한 배경처럼 의미 토큰이 없는 곳만 스케일을 쓴다.
  */
 @theme {
   --color-*: initial;
@@ -13,57 +15,93 @@
   --radius-*: initial;
   --shadow-*: initial;
 
+  /* 브랜드 서체(Toss Product Sans)는 재배포 권리가 확인되지 않아 쓰지 않는다. 레퍼런스가 제시한 한글 대체 서체 */
   --font-sans: 'Pretendard Variable', Pretendard, system-ui, sans-serif;
 
-  /* 기본 */
-  --color-white: oklch(100% 0 0);
-  --color-black: oklch(0% 0 0);
-  --color-canvas: oklch(98.5% 0.004 95);
-  --color-surface: oklch(100% 0 0);
-  --color-sunken: oklch(96.5% 0.005 95);
-  --color-line: oklch(90% 0.006 95);
-  --color-line-strong: oklch(78% 0.008 95);
-  /* 입력 컨트롤 테두리: 테두리만으로 영역을 알려야 하므로 배경 대비 3:1 이상 (WCAG 1.4.11) */
-  --color-line-input: oklch(62% 0.008 95);
-  --color-fg: oklch(22% 0.01 260);
-  --color-fg-muted: oklch(48% 0.01 260);
-  --color-accent: oklch(50% 0.13 250);
-  --color-accent-fg: oklch(99% 0 0);
-  --color-focus: oklch(50% 0.13 250);
+  --color-white: #ffffff;
+  --color-black: #000000;
 
-  /* 상태 (텍스트로 쓸 때도 흰 배경 대비 4.5:1 이상) */
-  --color-status-open: oklch(50% 0.11 155);
-  --color-status-warn: oklch(53% 0.13 65);
-  --color-status-full: oklch(50% 0.16 25);
-  --color-status-applied: oklch(50% 0.13 250);
-  --color-status-canceled: oklch(50% 0.01 260);
-  --color-status-ended: oklch(50% 0.01 260);
-  --color-status-danger: oklch(50% 0.18 27);
+  /* 스케일 (TDS Colors) */
+  --color-grey-50: #f9fafb;
+  --color-grey-100: #f2f4f6;
+  --color-grey-200: #e5e8eb;
+  --color-grey-300: #d1d6db;
+  --color-grey-400: #b0b8c1;
+  --color-grey-500: #8b95a1;
+  --color-grey-600: #6b7684;
+  --color-grey-700: #4e5968;
+  --color-grey-800: #333d4b;
+  --color-grey-900: #191f28;
+  --color-blue-50: #e8f3ff;
+  --color-blue-100: #c9e2ff;
+  --color-blue-500: #3182f6;
+  --color-blue-600: #2272eb;
+  --color-blue-700: #1b64da;
+  --color-blue-800: #1957c2;
+  --color-red-50: #ffeeee;
+  --color-red-700: #d22030;
+  --color-red-800: #bc1b2a;
+  --color-orange-50: #fff3e0;
+  --color-orange-500: #fe9800;
+  --color-green-50: #f0faf6;
+  --color-green-500: #03b26c;
+  --color-green-900: #027648;
 
-  /* 타이포 */
-  --text-title: 1.5rem;
-  --text-title--line-height: 2rem;
+  /* 면 — 회색 바탕 위에 흰 카드를 얹어 구분한다 (테두리 대신 면) */
+  --color-canvas: var(--color-grey-100);
+  --color-surface: var(--color-white);
+  --color-sunken: var(--color-grey-100);
+  --color-line: var(--color-grey-200);
+  --color-line-strong: var(--color-grey-300);
+  /* 입력 테두리: 배경 대비 3:1 이상 (WCAG 1.4.11) → grey500 (3.04) */
+  --color-line-input: var(--color-grey-500);
+
+  /* 글자 — 보조 텍스트는 회색 바탕 위에서도 4.5:1을 넘도록 grey700 (TDS의 muted grey500은 3.04라 쓰지 않음) */
+  --color-fg: var(--color-grey-900);
+  --color-fg-muted: var(--color-grey-700);
+  --color-fg-subtle: var(--color-grey-600);
+
+  /* 강조 — 흰 글자가 올라가는 채움은 blue700 (blue500 위 흰 글자는 3.71:1로 AA 미달) */
+  --color-accent: var(--color-blue-700);
+  --color-accent-hover: var(--color-blue-800);
+  --color-accent-fg: var(--color-white);
+  --color-accent-weak: var(--color-blue-50);
+  --color-focus: var(--color-blue-700);
+
+  /* 상태 */
+  --color-status-open: var(--color-green-900);
+  --color-status-warn: var(--color-orange-500);
+  --color-status-full: var(--color-red-700);
+  --color-status-applied: var(--color-blue-700);
+  --color-status-canceled: var(--color-grey-700);
+  --color-status-ended: var(--color-grey-700);
+  --color-status-danger: var(--color-red-700);
+
+  /* 타이포 — TDS 타입 스케일 (t2, t5, st10, t6, t7) */
+  --text-title: 1.625rem; /* t2 26/35 */
+  --text-title--line-height: 2.1875rem;
   --text-title--font-weight: 700;
-  --text-title--letter-spacing: -0.01em;
-  --text-heading: 1.125rem;
-  --text-heading--line-height: 1.625rem;
+  --text-heading: 1.0625rem; /* t5 17/25.5 */
+  --text-heading--line-height: 1.59375rem;
   --text-heading--font-weight: 600;
-  --text-body: 0.9375rem;
+  --text-body: 1rem; /* st10 16/24 */
   --text-body--line-height: 1.5rem;
   --text-body--font-weight: 400;
-  --text-label: 0.875rem;
-  --text-label--line-height: 1.25rem;
-  --text-label--font-weight: 500;
-  --text-caption: 0.8125rem;
-  --text-caption--line-height: 1.125rem;
+  --text-label: 0.9375rem; /* t6 15/22.5 */
+  --text-label--line-height: 1.40625rem;
+  --text-label--font-weight: 600;
+  --text-caption: 0.8125rem; /* t7 13/19.5 */
+  --text-caption--line-height: 1.21875rem;
   --text-caption--font-weight: 400;
 
-  /* 모양 */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  /* 모양 — TDS 버튼 모서리 (small 8, medium 10, large 14, xlarge 16) */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
-  --shadow-overlay: 0 8px 24px oklch(22% 0.01 260 / 0.12), 0 1px 3px oklch(22% 0.01 260 / 0.08);
+  /* 그림자: TDS에 공개된 값이 없어 이 프로젝트의 확장 값 */
+  --shadow-overlay: 0 8px 28px rgb(25 31 40 / 0.12), 0 1px 4px rgb(25 31 40 / 0.06);
   --container-content: 60rem;
   --container-dialog: 28rem;
   /* 다이얼로그 최대 높이: 화면 위아래 16px 여백 */
@@ -95,7 +133,7 @@
   }
   @keyframes highlight {
     from {
-      background-color: oklch(50% 0.13 250 / 0.08);
+      background-color: #e8f3ff;
     }
   }
 }
@@ -103,6 +141,9 @@
 @layer base {
   html {
     @apply bg-canvas font-sans text-body text-fg antialiased;
+    /* 한글은 음절이 아니라 띄어쓰기 단위로 줄바꿈하고, 긴 단어만 예외로 끊는다 */
+    word-break: keep-all;
+    overflow-wrap: anywhere;
   }
 
   body {

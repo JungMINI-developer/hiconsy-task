@@ -7,9 +7,7 @@ defineProps<{
 </script>
 
 <template>
-  <div
-    class="flex flex-col items-center gap-1 rounded-lg border border-dashed border-line-strong px-6 py-12 text-center"
-  >
+  <div class="flex flex-col items-center gap-1 rounded-xl bg-surface px-6 py-12 text-center">
     <p class="text-body font-medium">{{ title }}</p>
     <p v-if="description" class="text-caption text-fg-muted">{{ description }}</p>
     <div v-if="$slots.default" class="mt-4">

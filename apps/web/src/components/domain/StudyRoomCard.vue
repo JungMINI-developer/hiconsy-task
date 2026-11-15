@@ -22,8 +22,8 @@ const props = defineProps<{
   <article
     :class="
       cn(
-        'relative flex flex-col gap-3 rounded-lg border border-line bg-surface p-4 transition-colors duration-120 ease-standard sm:p-5',
-        props.to && 'has-[a[data-card-link]:hover]:border-line-strong',
+        'relative flex flex-col gap-3 rounded-xl bg-surface p-4 transition-colors duration-120 ease-standard sm:p-5',
+        props.to && 'has-[a[data-card-link]:hover]:bg-grey-50',
         props.highlighted && 'animate-highlight',
       )
     "
@@ -35,7 +35,7 @@ const props = defineProps<{
             v-if="props.to"
             :to="props.to"
             data-card-link
-            class="after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-focus"
+            class="after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-focus"
           >
             {{ room.name }}
           </RouterLink>

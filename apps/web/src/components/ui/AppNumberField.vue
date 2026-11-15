@@ -21,7 +21,7 @@ defineProps<{
 }>();
 
 const stepButton =
-  'inline-flex size-10 shrink-0 items-center justify-center text-fg-muted hover:bg-sunken hover:text-fg disabled:cursor-not-allowed disabled:opacity-40';
+  'inline-flex size-11 shrink-0 items-center justify-center text-fg-muted hover:bg-sunken hover:text-fg disabled:cursor-not-allowed disabled:opacity-40';
 </script>
 
 <template>
@@ -31,7 +31,7 @@ const stepButton =
       :min="min"
       :max="max"
       :format-options="{ useGrouping: false, maximumFractionDigits: 0 }"
-      class="inline-flex h-10 items-center overflow-hidden rounded-md border border-line-input bg-surface has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-focus has-[input[aria-invalid=true]]:border-status-danger"
+      class="inline-flex h-11 items-center overflow-hidden rounded-md border border-line-input bg-surface has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-focus has-[input[aria-invalid=true]]:border-status-danger"
       @update:model-value="(v?: number) => (model = v === undefined || Number.isNaN(v) ? null : v)"
     >
       <NumberFieldDecrement :class="stepButton" aria-label="줄이기">

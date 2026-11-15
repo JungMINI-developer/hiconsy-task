@@ -1,5 +1,7 @@
 # 디자인 시스템
 
+> **구현 후 변경:** 시각 톤은 토스 디자인 시스템(TDS Mobile)을 참고해 바꿨습니다(#23). 아래 값은 구현 전 초안이며, 실제 토큰·대비·컴포넌트 규칙은 [DESIGN.md](../DESIGN.md)가 기준입니다.
+
 토큰은 Tailwind CSS v4의 `@theme` 블록(`src/styles/main.css`)에 CSS 변수로 정의합니다. `@theme`에 적은 변수는 그대로 유틸리티 클래스가 됩니다(`--color-accent` → `bg-accent`, `text-accent`, `border-accent`). 컴포넌트는 이 클래스만 쓰고, 임의 값(`bg-[#3a5f8c]`, `p-[13px]`)은 쓰지 않습니다. 아래 값은 초안이며 `better-colors`로 대비를 검증한 뒤 확정합니다.
 
 ## 방향

@@ -215,10 +215,7 @@ function handleError(e: unknown) {
         </RouterLink>
       </AppAlert>
 
-      <p
-        v-if="noSlots"
-        class="rounded-md border border-dashed border-line-strong px-4 py-6 text-center text-body text-fg-muted"
-      >
+      <p v-if="noSlots" class="rounded-lg bg-grey-50 px-4 py-6 text-center text-body text-fg-muted">
         지금 고를 수 있는 시간이 없어요. 운영 기간이 끝났거나 곧 끝나요.
       </p>
 
@@ -256,14 +253,16 @@ function handleError(e: unknown) {
         </p>
       </template>
 
-      <div class="mt-1 flex items-center justify-end gap-2">
-        <span v-if="unchanged" class="mr-auto text-caption text-fg-muted">
-          바꿀 시간을 골라 주세요
-        </span>
-        <AppButton variant="secondary" @click="open = false">닫기</AppButton>
+      <p v-if="unchanged" class="-mb-2 text-caption text-fg-muted">바꿀 시간을 골라 주세요</p>
+      <div class="mt-2 flex gap-2">
+        <AppButton variant="secondary" size="lg" class="flex-1" @click="open = false"
+          >닫기</AppButton
+        >
         <AppButton
           v-if="!noSlots"
           type="submit"
+          size="lg"
+          class="flex-1"
           :loading="saving"
           :disabled="!selected || unchanged"
         >

@@ -141,7 +141,7 @@ const menuItems = [
     </p>
 
     <div v-if="rooms.showSkeleton.value" class="grid gap-3 lg:grid-cols-2">
-      <AppSkeleton v-for="i in 4" :key="i" class="h-32 rounded-lg" />
+      <AppSkeleton v-for="i in 4" :key="i" class="h-32 rounded-xl" />
     </div>
     <ErrorState
       v-else-if="rooms.status.value === 'error' && !rooms.data.value"
@@ -163,7 +163,7 @@ const menuItems = [
           tab === 'active' ? '운영 중이거나 예정된 자습실이 없어요' : '종료된 자습실이 없어요'
         "
       >
-        <AppButton v-if="tab === 'active'" variant="secondary" @click="createDialog.open()">
+        <AppButton v-if="tab === 'active'" variant="weak" @click="createDialog.open()">
           새 자습실
         </AppButton>
       </EmptyState>

@@ -114,7 +114,7 @@ function onSaved(visit: Visit, mode: 'apply' | 'update') {
     </p>
 
     <div v-if="page.showSkeleton.value" class="grid gap-3 lg:grid-cols-2">
-      <AppSkeleton v-for="i in 4" :key="i" class="h-36 rounded-lg" />
+      <AppSkeleton v-for="i in 4" :key="i" class="h-36 rounded-xl" />
     </div>
     <ErrorState
       v-else-if="page.status.value === 'error' && !page.data.value"
@@ -180,6 +180,7 @@ function onSaved(visit: Visit, mode: 'apply' | 'update') {
                   {{ state === 'full' ? '정원이 다 찼어요' : '신청할 수 있는 시간이 지났어요' }}
                 </span>
                 <AppButton
+                  variant="weak"
                   size="sm"
                   :disabled="state !== 'available'"
                   :aria-describedby="state !== 'available' ? `reason-${room.id}` : undefined"

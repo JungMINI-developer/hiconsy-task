@@ -129,10 +129,8 @@ async function confirmDelete() {
       </RouterLink>
     </template>
     <template v-if="room" #actions>
-      <AppButton variant="secondary" @click="editDialog.open()">수정</AppButton>
-      <AppButton variant="secondary" class="text-status-danger" @click="deleteOpen = true">
-        삭제
-      </AppButton>
+      <AppButton variant="light" @click="editDialog.open()">수정</AppButton>
+      <AppButton variant="danger-weak" @click="deleteOpen = true"> 삭제 </AppButton>
     </template>
 
     <div v-if="detail.showSkeleton.value" class="flex flex-col gap-4">
@@ -158,7 +156,7 @@ async function confirmDelete() {
     />
 
     <template v-else-if="room">
-      <dl class="mb-8 flex flex-col gap-3 rounded-lg border border-line bg-surface p-4 sm:p-5">
+      <dl class="mb-8 flex flex-col gap-3 rounded-xl bg-surface p-4 sm:p-5">
         <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-6">
           <dt class="w-20 shrink-0 text-label text-fg-muted">운영 기간</dt>
           <dd class="flex flex-wrap items-center gap-2 tabular-nums">
@@ -177,7 +175,7 @@ async function confirmDelete() {
       <!-- 신청자 -->
       <section v-if="tab === 'applicants'" aria-label="신청자">
         <EmptyState v-if="applicants.length === 0" title="아직 신청한 학생이 없어요" />
-        <div v-else class="overflow-x-auto rounded-lg border border-line bg-surface">
+        <div v-else class="overflow-x-auto rounded-xl bg-surface">
           <table class="w-full text-left text-body">
             <thead class="border-b border-line text-label text-fg-muted">
               <tr>
@@ -226,7 +224,7 @@ async function confirmDelete() {
         </div>
         <EmptyState v-if="histories.length === 0" title="아직 신청한 학생이 없어요" />
         <EmptyState v-else-if="visibleHistories.length === 0" title="조건에 맞는 이력이 없어요" />
-        <div v-else class="rounded-lg border border-line bg-surface p-4 sm:p-5">
+        <div v-else class="rounded-xl bg-surface p-4 sm:p-5">
           <HistoryTimeline :items="visibleHistories" />
         </div>
       </section>

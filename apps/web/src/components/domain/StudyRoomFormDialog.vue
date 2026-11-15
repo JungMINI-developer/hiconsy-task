@@ -240,12 +240,12 @@ async function handleError(e: unknown) {
         label="운영 시작"
         :error="fieldError('start')"
       >
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
           <AppInput
             :id="id"
             v-model="values.startDate"
             type="date"
-            class="min-w-0 flex-1"
+            class="min-w-40 flex-1"
             :invalid="invalid"
             :aria-describedby="describedby"
             @blur="touched.start = true"
@@ -266,13 +266,13 @@ async function handleError(e: unknown) {
         label="운영 종료"
         :error="fieldError('end')"
       >
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
           <AppInput
             :id="id"
             v-model="values.endDate"
             type="date"
             :min="values.startDate || undefined"
-            class="min-w-0 flex-1"
+            class="min-w-40 flex-1"
             :invalid="invalid"
             :aria-describedby="describedby"
             @blur="touched.end = true"
@@ -288,9 +288,11 @@ async function handleError(e: unknown) {
         </div>
       </FormField>
 
-      <div class="mt-1 flex justify-end gap-2">
-        <AppButton variant="secondary" @click="open = false">닫기</AppButton>
-        <AppButton type="submit" :loading="saving">저장</AppButton>
+      <div class="mt-2 flex gap-2">
+        <AppButton variant="secondary" size="lg" class="flex-1" @click="open = false"
+          >닫기</AppButton
+        >
+        <AppButton type="submit" size="lg" class="flex-1" :loading="saving">저장</AppButton>
       </div>
     </form>
   </AppDialog>

@@ -38,7 +38,7 @@ function focusFirstField(event: Event) {
         class="fixed inset-0 z-40 bg-fg/30 data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
       />
       <DialogContent
-        class="fixed inset-x-4 top-1/2 z-50 mx-auto flex max-h-dialog-h max-w-dialog -translate-y-1/2 flex-col rounded-lg bg-surface shadow-overlay focus:outline-none data-[state=closed]:animate-fade-out data-[state=open]:animate-dialog-in"
+        class="fixed inset-x-4 top-1/2 z-50 mx-auto flex max-h-dialog-h max-w-dialog -translate-y-1/2 flex-col rounded-xl bg-surface shadow-overlay focus:outline-none data-[state=closed]:animate-fade-out data-[state=open]:animate-dialog-in"
         @open-auto-focus="focusFirstField"
       >
         <header class="flex items-start justify-between gap-4 px-6 pt-5 pb-3">

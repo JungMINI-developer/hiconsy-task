@@ -37,7 +37,7 @@ const emit = defineEmits<{ select: [key: string] }>();
       <DropdownMenuContent
         align="end"
         :side-offset="4"
-        class="z-50 min-w-32 rounded-md border border-line bg-surface p-1 shadow-overlay data-[state=open]:animate-fade-in"
+        class="z-50 min-w-32 rounded-lg bg-surface p-1.5 shadow-overlay data-[state=open]:animate-fade-in"
       >
         <DropdownMenuItem
           v-for="item in items"
