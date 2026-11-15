@@ -64,11 +64,23 @@ const groups = computed(() => {
   return byGroup;
 });
 
-const tabs = computed(() => [
-  { value: 'upcoming' as const, label: '예정', count: groups.value.upcoming.length },
-  { value: 'past' as const, label: '지난 방문' },
-  { value: 'canceled' as const, label: '취소됨', count: groups.value.canceled.length },
-]);
+// 불러오기 전·실패 시에는 개수를 숨긴다 (0건으로 오해하지 않게)
+const tabs = computed(() => {
+  const loaded = !!page.data.value;
+  return [
+    {
+      value: 'upcoming' as const,
+      label: '예정',
+      count: loaded ? groups.value.upcoming.length : undefined,
+    },
+    { value: 'past' as const, label: '지난 방문' },
+    {
+      value: 'canceled' as const,
+      label: '취소됨',
+      count: loaded ? groups.value.canceled.length : undefined,
+    },
+  ];
+});
 const visible = computed(() => groups.value[tab.value]);
 
 const EMPTY: Record<VisitGroup, string> = {
