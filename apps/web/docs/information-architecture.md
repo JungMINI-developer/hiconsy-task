@@ -32,16 +32,16 @@
 
 ## 화면 ↔ 기능 ↔ 요구사항 매핑
 
-| 화면 | 기능 (FN)                                         | 요구사항 (FR)                     | API                                                                        |
-| ---- | ------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------- |
-| S-00 | 역할·학생 선택                                    | (로그인 대체)                     | `GET /students`                                                            |
-| S-10 | FN-ROM-01 목록, FN-ROM-04 삭제                    | FR-ROM-01, FR-ROM-05              | `GET /study-rooms`, `DELETE /study-rooms/:id`                              |
-| S-11 | FN-ROM-03 상세·이력, FN-ROM-04 삭제               | FR-ROM-03, FR-ROM-05              | `GET /study-rooms/:id`, `GET /study-rooms/:id/histories`                   |
-| S-12 | FN-ROM-02 등록·수정, FN-ROM-05 기존 신청 처리     | FR-ROM-02, FR-ROM-04, (FR-ROM-06) | `POST`, `PATCH /study-rooms/:id`                                           |
-| S-13 | FN-STD-01 목록, (FN-STD-02 관리)                  | FR-STD-01, (FR-STD-02)            | `GET /students` (`POST/PATCH/DELETE`)                                      |
-| S-20 | FN-ROM-01 목록, FN-VST-01 신청 진입               | FR-ROM-01, FR-VST-01              | `GET /study-rooms` (내 신청 여부: 방문 API에서 확정)                       |
-| S-21 | FN-VST-02 수정, FN-VST-03 취소, FN-VST-04 내 신청 | FR-VST-02, FR-VST-03, FR-VST-04   | `GET /students/:id/visits`, `PATCH /visits/:id`, `POST /visits/:id/cancel` |
-| S-22 | FN-VST-01 신청, FN-VST-02 수정                    | FR-VST-01, FR-VST-02              | `POST /visits`, `PATCH /visits/:id`                                        |
+| 화면 | 기능 (FN)                                         | 요구사항 (FR)                     | API                                                                                     |
+| ---- | ------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------- |
+| S-00 | 역할·학생 선택                                    | (로그인 대체)                     | `GET /students`                                                                         |
+| S-10 | FN-ROM-01 목록, FN-ROM-04 삭제                    | FR-ROM-01, FR-ROM-05              | `GET /study-rooms`, `DELETE /study-rooms/:id`                                           |
+| S-11 | FN-ROM-03 상세·이력, FN-ROM-04 삭제               | FR-ROM-03, FR-ROM-05              | `GET /study-rooms/:id`, `GET /study-rooms/:id/histories`, `GET /study-rooms/:id/visits` |
+| S-12 | FN-ROM-02 등록·수정, FN-ROM-05 기존 신청 처리     | FR-ROM-02, FR-ROM-04, (FR-ROM-06) | `POST`, `PATCH /study-rooms/:id`                                                        |
+| S-13 | FN-STD-01 목록, (FN-STD-02 관리)                  | FR-STD-01, (FR-STD-02)            | `GET /students` (`POST/PATCH/DELETE`)                                                   |
+| S-20 | FN-ROM-01 목록, FN-VST-01 신청 진입               | FR-ROM-01, FR-VST-01              | `GET /study-rooms` (내 신청 여부: 방문 API에서 확정)                                    |
+| S-21 | FN-VST-02 수정, FN-VST-03 취소, FN-VST-04 내 신청 | FR-VST-02, FR-VST-03, FR-VST-04   | `GET /students/:id/visits`, `PATCH /visits/:id`, `POST /visits/:id/cancel`              |
+| S-22 | FN-VST-01 신청, FN-VST-02 수정                    | FR-VST-01, FR-VST-02              | `POST /visits`, `PATCH /visits/:id`                                                     |
 
 괄호는 선택 요구사항입니다. 자습실(`/study-rooms`)·학생(`/students`) API는 구현되어 있고(Swagger `/api/docs`), 방문(`/visits`) 경로는 방문 API 구현 이슈에서 확정되면 갱신합니다.
 
