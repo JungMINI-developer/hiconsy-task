@@ -54,7 +54,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @hiconsy/api test:e2e
+      - run: pnpm turbo run test:e2e --filter=@hiconsy/api
 
   web-e2e:
     name: Web e2e (Playwright)
