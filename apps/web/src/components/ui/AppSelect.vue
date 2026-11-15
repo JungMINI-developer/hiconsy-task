@@ -35,6 +35,11 @@ const props = defineProps<{
   describedby?: string;
   /** 보이는 라벨이 없을 때의 접근 가능한 이름 */
   ariaLabel?: string;
+  /**
+   * 항상 아래로 연다. 선택지가 많아(예: 30분 단위 시각 48개) 아래 공간에 다 들어가지 않으면
+   * 기본 동작은 위로 뒤집히는데, 시간처럼 위→아래로 읽는 목록은 아래로 열고 목록 안에서 스크롤하게 한다.
+   */
+  openBelow?: boolean;
   /** 트리거 버튼에 붙는 클래스 (너비 등) */
   class?: HTMLAttributes['class'];
 }>();
@@ -74,10 +79,12 @@ const selected = computed(() => props.options.find((o) => o.value === model.valu
     <SelectPortal>
       <SelectContent
         position="popper"
+        side="bottom"
+        :avoid-collisions="!props.openBelow"
         :side-offset="4"
         class="z-50 max-h-(--reka-select-content-available-height) min-w-(--reka-select-trigger-width) overflow-hidden rounded-lg bg-surface shadow-overlay data-[state=open]:animate-fade-in"
       >
-        <SelectViewport class="p-1.5">
+        <SelectViewport :class="cn('p-1.5', props.openBelow && 'max-h-64')">
           <SelectItem
             v-for="option in props.options"
             :key="option.value"

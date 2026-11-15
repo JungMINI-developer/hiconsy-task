@@ -1,5 +1,6 @@
 import { enterAsStudent, enterAsTeacher, expect, kst, test } from './support/fixtures';
 import { nav, pick, toast } from './support/ui';
+import type { Locator, Page } from '@playwright/test';
 
 /** #26 실사용 점검에서 고친 UX — 다시 나빠지지 않도록 고정한다 */
 
@@ -164,5 +165,44 @@ test.describe('학생 · 표기', () => {
     await expect(time).toHaveClass(/text-heading/);
     await expect(card.getByRole('heading', { name: 'A 자습실' })).toBeVisible();
     await expect(toast(page, '없음')).toHaveCount(0);
+  });
+});
+
+/** 시간 선택 목록이 필드 아래로 열리고, 화면 안에 있으며, 고른 시각이 보이는지 */
+async function expectOpensBelow(page: Page, trigger: Locator) {
+  // 열리면 바깥 요소가 접근성 트리에서 가려지므로 위치는 열기 전에 잰다
+  const t = (await trigger.boundingBox())!;
+  await trigger.click();
+  const list = page.getByRole('listbox');
+  await expect(list).toBeVisible();
+  const l = (await list.boundingBox())!;
+  expect(l.y, '목록이 필드 아래에서 시작').toBeGreaterThanOrEqual(t.y + t.height);
+  expect(l.y + l.height, '목록이 화면 안에').toBeLessThanOrEqual(page.viewportSize()!.height);
+  await expect(page.getByRole('option', { selected: true })).toBeInViewport();
+  await page.keyboard.press('Escape');
+  await expect(list).toBeHidden();
+}
+
+test.describe('시간 선택', () => {
+  test('자습실 폼의 시각 목록은 아래로 열린다', async ({ page }) => {
+    await enterAsTeacher(page);
+    await page.goto('/teacher/rooms?new=1');
+    const dialog = page.getByRole('dialog', { name: '새 자습실' });
+    await expectOpensBelow(page, dialog.getByRole('combobox', { name: '운영 시작 시각' }));
+    await expectOpensBelow(page, dialog.getByRole('combobox', { name: '운영 종료 시각' }));
+  });
+
+  test('방문 신청의 시각 목록은 아래로 열린다', async ({ page, seed }) => {
+    const room = await seed.room({
+      name: 'A 자습실',
+      startDate: kst(1, 0),
+      endDate: kst(1, 23, 30),
+    });
+    const me = await seed.student('김하늘', '010-1111-1111');
+    await enterAsStudent(page, me);
+    await page.goto(`/student/rooms?apply=${room.id}`);
+    const dialog = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
+    await expectOpensBelow(page, dialog.getByRole('combobox', { name: '방문 시작 시각' }));
+    await expectOpensBelow(page, dialog.getByRole('combobox', { name: '방문 종료 시각' }));
   });
 });

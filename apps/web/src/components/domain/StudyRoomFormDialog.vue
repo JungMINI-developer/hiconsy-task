@@ -277,6 +277,7 @@ async function handleError(e: unknown) {
             :options="timeOptions"
             class="w-28"
             aria-label="운영 시작 시각"
+            open-below
             @update:model-value="(v) => moveStart({ time: v })"
           />
         </div>
@@ -304,6 +305,7 @@ async function handleError(e: unknown) {
             :options="timeOptions"
             class="w-28"
             aria-label="운영 종료 시각"
+            open-below
             :invalid="invalid"
             @update:model-value="touched.end = true"
           />

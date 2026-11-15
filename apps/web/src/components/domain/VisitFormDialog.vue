@@ -242,6 +242,7 @@ function handleError(e: unknown) {
               v-model="start"
               :options="startOptions"
               aria-label="방문 시작 시각"
+              open-below
               class="flex-1"
             />
             <span class="text-fg-muted" aria-hidden="true">–</span>
@@ -249,6 +250,7 @@ function handleError(e: unknown) {
               v-model="end"
               :options="endOptions"
               aria-label="방문 종료 시각"
+              open-below
               class="flex-1"
             />
           </div>
