@@ -180,7 +180,7 @@ async function confirmCancel() {
     </p>
 
     <div v-if="page.showSkeleton.value" class="flex flex-col gap-3">
-      <AppSkeleton v-for="i in 3" :key="i" class="h-28 rounded-lg" />
+      <AppSkeleton v-for="i in 3" :key="i" class="h-28 rounded-xl" />
     </div>
     <ErrorState
       v-else-if="page.status.value === 'error' && !page.data.value"
@@ -205,7 +205,7 @@ async function confirmCancel() {
           :key="visit.id"
           :class="
             cn(
-              'flex flex-col gap-3 rounded-lg border border-line bg-surface p-4 sm:p-5',
+              'flex flex-col gap-3 rounded-xl bg-surface p-4 sm:p-5',
               highlightedId === visit.id && 'animate-highlight',
             )
           "
@@ -249,12 +249,7 @@ async function confirmCancel() {
                 <AppButton variant="secondary" size="sm" @click="editDialog.open(visit.id)">
                   시간 변경
                 </AppButton>
-                <AppButton
-                  variant="ghost"
-                  size="sm"
-                  class="text-status-danger"
-                  @click="canceling = visit"
-                >
+                <AppButton variant="danger-weak" size="sm" @click="canceling = visit">
                   취소
                 </AppButton>
               </template>
@@ -264,7 +259,7 @@ async function confirmCancel() {
             </template>
             <AppButton
               v-else
-              variant="secondary"
+              variant="weak"
               size="sm"
               @click="applyDialog.open(visit.studyRoom.id)"
             >

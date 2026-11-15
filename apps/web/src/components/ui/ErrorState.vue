@@ -15,7 +15,7 @@ const emit = defineEmits<{ retry: [] }>();
 <template>
   <div
     role="alert"
-    class="flex flex-col items-center gap-1 rounded-lg border border-line bg-surface px-6 py-10 text-center"
+    class="flex flex-col items-center gap-1 rounded-xl bg-surface px-6 py-10 text-center"
   >
     <CircleAlert class="mb-1 size-5 text-status-danger" aria-hidden="true" />
     <p class="text-body font-medium">{{ title }}</p>

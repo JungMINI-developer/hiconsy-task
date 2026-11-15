@@ -42,7 +42,7 @@ const label = computed(() =>
       :aria-valuemax="max"
       :aria-valuetext="label"
       :aria-label="perspective === 'student' ? '남은 자리' : '신청 인원'"
-      class="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-sunken sm:w-32"
+      class="h-2 w-24 shrink-0 overflow-hidden rounded-full bg-sunken sm:w-32"
     >
       <div
         :class="cn('h-full rounded-full transition-[width] duration-200', fillClass[level])"

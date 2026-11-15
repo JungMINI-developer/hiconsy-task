@@ -161,7 +161,7 @@ function onMenu(student: Student, key: string) {
           <template v-if="query">검색 결과 {{ filtered.length }}명</template>
         </p>
         <EmptyState v-if="filtered.length === 0" title="찾는 학생이 없어요" />
-        <div v-else class="overflow-x-auto rounded-lg border border-line bg-surface">
+        <div v-else class="overflow-x-auto rounded-xl bg-surface">
           <table class="w-full text-left text-body">
             <thead class="border-b border-line text-label text-fg-muted">
               <tr>

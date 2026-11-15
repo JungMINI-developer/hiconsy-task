@@ -94,7 +94,7 @@ function enter() {
           v-for="item in roles"
           :key="item.value"
           :value="item.value"
-          class="flex flex-col items-start gap-1 rounded-lg border border-line-strong bg-surface p-4 text-left transition-colors duration-120 ease-standard hover:border-fg-muted data-[state=checked]:border-accent data-[state=checked]:ring-1 data-[state=checked]:ring-accent"
+          class="flex flex-col items-start gap-1 rounded-xl border-2 border-transparent bg-surface p-5 text-left transition-[background-color,border-color,transform] duration-120 ease-standard hover:bg-grey-50 active:scale-98 data-[state=checked]:border-accent data-[state=checked]:bg-blue-50"
         >
           <span class="text-heading">{{ item.label }}</span>
           <span class="text-caption text-fg-muted">{{ item.description }}</span>
@@ -115,7 +115,7 @@ function enter() {
         />
         <p
           v-else-if="students.data.value && students.data.value.length === 0"
-          class="rounded-md border border-dashed border-line-strong px-4 py-6 text-center text-body text-fg-muted"
+          class="rounded-lg bg-grey-50 px-4 py-6 text-center text-body text-fg-muted"
         >
           등록된 학생이 없어요. 강사로 들어가 학생을 먼저 등록해 주세요.
         </p>
@@ -138,9 +138,7 @@ function enter() {
         </FormField>
       </section>
 
-      <div class="flex justify-end">
-        <AppButton type="submit" :disabled="!role">들어가기</AppButton>
-      </div>
+      <AppButton type="submit" size="lg" class="w-full" :disabled="!role">들어가기</AppButton>
     </form>
   </main>
 </template>

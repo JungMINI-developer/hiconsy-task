@@ -64,9 +64,9 @@ const props = defineProps<{
       <SelectContent
         position="popper"
         :side-offset="4"
-        class="z-50 max-h-(--reka-select-content-available-height) min-w-(--reka-select-trigger-width) overflow-hidden rounded-md border border-line bg-surface shadow-overlay data-[state=open]:animate-fade-in"
+        class="z-50 max-h-(--reka-select-content-available-height) min-w-(--reka-select-trigger-width) overflow-hidden rounded-lg bg-surface shadow-overlay data-[state=open]:animate-fade-in"
       >
-        <SelectViewport class="p-1">
+        <SelectViewport class="p-1.5">
           <SelectItem
             v-for="option in props.options"
             :key="option.value"

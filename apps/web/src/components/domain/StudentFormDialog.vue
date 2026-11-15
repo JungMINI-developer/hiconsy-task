@@ -140,9 +140,11 @@ async function submit() {
           @blur="touched.phone = true"
         />
       </FormField>
-      <div class="mt-1 flex justify-end gap-2">
-        <AppButton variant="secondary" @click="open = false">닫기</AppButton>
-        <AppButton type="submit" :loading="saving">저장</AppButton>
+      <div class="mt-2 flex gap-2">
+        <AppButton variant="secondary" size="lg" class="flex-1" @click="open = false"
+          >닫기</AppButton
+        >
+        <AppButton type="submit" size="lg" class="flex-1" :loading="saving">저장</AppButton>
       </div>
     </form>
   </AppDialog>
