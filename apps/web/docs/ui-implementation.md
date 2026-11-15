@@ -9,13 +9,15 @@
 | `class-variance-authority` + `tailwind-merge` + `clsx` | 버튼·배지처럼 변형이 많은 컴포넌트의 클래스를 `cva`로 정리하고, `cn()`으로 외부에서 넘긴 클래스와 충돌 없이 합친다                                                                                                    |
 | `@internationalized/date`                              | Reka UI 날짜 컴포넌트가 요구하는 날짜 타입. 시간대 변환을 이 계층에서만 처리                                                                                                                                          |
 | `pretendard`                                           | 한글 UI 서체 (npm으로 받아 self-host)                                                                                                                                                                                 |
+| `lucide-vue-next`                                      | 선 굵기가 일정한 아이콘 세트. 쓰는 아이콘만 번들에 들어간다(트리 셰이킹). 아이콘은 라벨을 보조할 때만 쓰고 `aria-hidden`을 붙인다                                                                                     |
 | `prettier-plugin-tailwindcss` (dev)                    | 클래스 순서를 자동 정렬해 리뷰 diff를 줄인다                                                                                                                                                                          |
 
 쓰지 않는 것: shadcn-vue(같은 Reka UI + Tailwind 조합이지만 완성 컴포넌트를 받아오면 기본 테마 인상이 남는다. 구현 참고 자료로만 본다), Vuetify/Element Plus(완성형 라이브러리는 기본 테마 인상이 강하고 번들이 큼), 전역 서버 캐시 라이브러리(재조회 전략으로 충분).
 
 ```bash
-pnpm --filter @hiconsy/web add reka-ui @internationalized/date pretendard class-variance-authority tailwind-merge clsx
-pnpm --filter @hiconsy/web add -D tailwindcss @tailwindcss/vite prettier-plugin-tailwindcss
+pnpm --filter @hiconsy/web add reka-ui @internationalized/date pretendard class-variance-authority tailwind-merge clsx lucide-vue-next
+pnpm --filter @hiconsy/web add -D tailwindcss @tailwindcss/vite
+pnpm add -Dw prettier-plugin-tailwindcss  # 루트 .prettierrc에서 사용
 ```
 
 ```ts
@@ -82,7 +84,7 @@ src/
   ```ts
   // components/ui/button.variants.ts
   export const buttonVariants = cva(
-    'inline-flex items-center justify-center gap-2 rounded-md px-4 h-10 text-label transition-colors duration-120 ease-standard disabled:opacity-50',
+    'inline-flex h-10 items-center justify-center gap-2 rounded-md px-4 text-label transition-colors duration-120 ease-standard disabled:opacity-50',
     {
       variants: {
         variant: {
