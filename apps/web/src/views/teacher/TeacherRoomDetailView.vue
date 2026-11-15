@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import { ErrorCode, type StudyRoom, type StudyRoomHistory } from '@hiconsy/shared';
+import {
+  ErrorCode,
+  type StudyRoom,
+  type StudyRoomHistory,
+  type StudyRoomVisit,
+} from '@hiconsy/shared';
 import { ChevronLeft, Search } from 'lucide-vue-next';
 import { studyRoomsApi } from '@/api/studyRooms';
 import { useAsync } from '@/composables/useAsync';
@@ -16,7 +21,7 @@ import {
   isSameDay,
 } from '@/utils/datetime';
 import { errorMessage } from '@/utils/errorMessage';
-import { deriveApplicants, filterHistories, type HistoryFilter } from '@/utils/history';
+import { filterHistories, type HistoryFilter } from '@/utils/history';
 import PageShell from '@/components/layout/PageShell.vue';
 import CapacityBar from '@/components/domain/CapacityBar.vue';
 import HistoryTimeline from '@/components/domain/HistoryTimeline.vue';
@@ -39,11 +44,12 @@ const router = useRouter();
 const toast = useToast();
 
 const detail = useAsync(async () => {
-  const [room, histories] = await Promise.all([
+  const [room, histories, applicants] = await Promise.all([
     studyRoomsApi.get(props.id),
     studyRoomsApi.histories(props.id),
+    studyRoomsApi.visits(props.id),
   ]);
-  return { room, histories };
+  return { room, histories, applicants };
 });
 useRefetchOnVisible(detail.run);
 
@@ -58,7 +64,8 @@ const tab = computed<Tab>({
   set: (v) => void router.replace({ query: { ...route.query, tab: v } }),
 });
 
-const applicants = computed(() => deriveApplicants(histories.value));
+/** 현재 유효 신청 — 서버가 학생 연락처와 함께 준다 (동명이인 구분) */
+const applicants = computed<StudyRoomVisit[]>(() => detail.data.value?.applicants ?? []);
 const tabs = computed(() => [
   { value: 'applicants' as const, label: '신청자', count: applicants.value.length },
   { value: 'histories' as const, label: '이력', count: histories.value.length },
@@ -180,13 +187,15 @@ async function confirmDelete() {
             <thead class="border-b border-line text-label text-fg-muted">
               <tr>
                 <th scope="col" class="px-4 py-2.5 font-medium">이름</th>
+                <th scope="col" class="px-4 py-2.5 font-medium">연락처</th>
                 <th scope="col" class="px-4 py-2.5 font-medium">방문 시간</th>
                 <th scope="col" class="hidden px-4 py-2.5 font-medium sm:table-cell">신청일</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-line">
-              <tr v-for="a in applicants" :key="a.visitId">
+              <tr v-for="a in applicants" :key="a.id">
                 <td class="px-4 py-3 font-medium whitespace-nowrap">{{ a.student.name }}</td>
+                <td class="px-4 py-3 whitespace-nowrap tabular-nums">{{ a.student.phone }}</td>
                 <td class="px-4 py-3 whitespace-nowrap tabular-nums">
                   {{ visitRange(a.startAt, a.endAt) }}
                 </td>

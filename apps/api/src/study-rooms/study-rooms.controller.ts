@@ -11,7 +11,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import type { StudyRoom, StudyRoomHistory } from '@hiconsy/shared';
+import type { StudyRoom, StudyRoomHistory, StudyRoomVisit } from '@hiconsy/shared';
 import { CreateStudyRoomDto } from './dto/create-study-room.dto.js';
 import { UpdateStudyRoomDto } from './dto/update-study-room.dto.js';
 import { StudyRoomsService } from './study-rooms.service.js';
@@ -46,6 +46,13 @@ export class StudyRoomsController {
   @ApiResponse({ status: 404, description: 'STUDY_ROOM_NOT_FOUND' })
   findHistories(@Param('id', ParseIntPipe) id: number): Promise<StudyRoomHistory[]> {
     return this.studyRoomsService.findHistories(id);
+  }
+
+  @Get(':id/visits')
+  @ApiOperation({ summary: '자습실의 현재 유효 신청 목록 (학생 연락처 포함, 방문 시작 순)' })
+  @ApiResponse({ status: 404, description: 'STUDY_ROOM_NOT_FOUND' })
+  findVisits(@Param('id', ParseIntPipe) id: number): Promise<StudyRoomVisit[]> {
+    return this.studyRoomsService.findVisits(id);
   }
 
   @Patch(':id')

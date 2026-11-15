@@ -45,3 +45,17 @@ export interface StudyRoomHistory {
   reason: string | null;
   createdAt: IsoDateString;
 }
+
+/**
+ * 자습실의 현재 유효 신청(APPLIED) 1건 — 강사 화면 [신청자] 탭.
+ * 동명이인을 구분할 수 있도록 학생 연락처를 함께 준다.
+ */
+export interface StudyRoomVisit {
+  /** 방문 신청 id */
+  id: number;
+  student: { id: number; name: string; phone: string };
+  startAt: IsoDateString;
+  endAt: IsoDateString;
+  /** 가장 최근 신청 시각 (취소 후 재신청했다면 재신청 시각) */
+  appliedAt: IsoDateString;
+}

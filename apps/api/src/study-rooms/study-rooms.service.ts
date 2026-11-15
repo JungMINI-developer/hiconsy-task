@@ -1,12 +1,17 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { ErrorCode, type StudyRoom, type StudyRoomHistory } from '@hiconsy/shared';
+import {
+  ErrorCode,
+  type StudyRoom,
+  type StudyRoomHistory,
+  type StudyRoomVisit,
+} from '@hiconsy/shared';
 import { DomainException } from '../common/exceptions/domain.exception.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CancelReason, cancelAppliedVisitsBySystem } from '../visits/visit-cancellation.js';
 import type { CreateStudyRoomDto } from './dto/create-study-room.dto.js';
 import type { UpdateStudyRoomDto } from './dto/update-study-room.dto.js';
 import { lockStudyRoom, studyRoomNotFound } from './study-room-lock.js';
-import { toStudyRoom, toStudyRoomHistory } from './study-room.mapper.js';
+import { toStudyRoom, toStudyRoomHistory, toStudyRoomVisit } from './study-room.mapper.js';
 
 /** 현재 유효 신청(APPLIED) 수를 함께 조회하기 위한 include */
 const withAppliedCount = {
@@ -132,6 +137,32 @@ export class StudyRoomsService {
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
     return histories.map(toStudyRoomHistory);
+  }
+
+  /**
+   * 현재 유효 신청(APPLIED) 목록 — 강사 화면 [신청자] 탭.
+   * 학생 연락처를 함께 줘서 동명이인을 구분하게 한다.
+   * (학생이 삭제되면 신청이 자동 취소되므로 여기 나오는 학생은 모두 삭제되지 않은 학생이다)
+   */
+  async findVisits(id: number): Promise<StudyRoomVisit[]> {
+    const exists = await this.prisma.studyRoom.count({ where: { id, deletedAt: null } });
+    if (exists === 0) throw studyRoomNotFound();
+
+    const visits = await this.prisma.visit.findMany({
+      where: { studyRoomId: id, status: 'APPLIED' },
+      include: {
+        student: { select: { id: true, name: true, phone: true } },
+        // 재신청이면 마지막 APPLY 시각을 신청 시각으로 쓴다
+        histories: {
+          where: { action: 'APPLY' },
+          select: { createdAt: true },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 1,
+        },
+      },
+      orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+    });
+    return visits.map(toStudyRoomVisit);
   }
 }
 

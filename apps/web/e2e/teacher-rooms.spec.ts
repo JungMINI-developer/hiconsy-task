@@ -117,6 +117,27 @@ test.describe('강사 · 자습실 상세 · 삭제', () => {
     await expect(items).toHaveCount(2);
   });
 
+  test('신청자 탭은 연락처를 함께 보여 동명이인을 구분한다', async ({ page, seed }) => {
+    const room = await seed.room({ name: 'A 자습실' });
+    const a = await seed.student('김하늘', '010-1111-1111');
+    const b = await seed.student('김하늘', '010-5656-7878');
+    const c = await seed.student('이도윤', '010-3333-3333');
+    await seed.visit(a.id, room.id, kst(1, 13), kst(1, 14));
+    await seed.visit(b.id, room.id, kst(1, 10), kst(1, 11));
+    const canceled = await seed.visit(c.id, room.id, kst(1, 11), kst(1, 12));
+    await seed.cancelVisit(c.id, canceled.id);
+
+    await page.goto(`/teacher/rooms/${room.id}`);
+    await expect(page.getByRole('tab', { name: /신청자\s*2/ })).toBeVisible();
+    const rows = page.getByRole('row');
+    // 머리글 + 2명, 방문 시작 순 — 취소한 학생은 빠진다
+    await expect(rows).toHaveCount(3);
+    await expect(rows.nth(1)).toContainText('김하늘');
+    await expect(rows.nth(1)).toContainText('010-5656-7878');
+    await expect(rows.nth(2)).toContainText('010-1111-1111');
+    await expect(page.getByRole('cell', { name: '이도윤', exact: true })).toHaveCount(0);
+  });
+
   test('삭제하면 영향받는 신청 수를 알려주고, 확인 후 목록에서 사라진다', async ({
     page,
     seed,

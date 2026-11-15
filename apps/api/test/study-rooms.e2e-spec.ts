@@ -261,4 +261,91 @@ describe('StudyRooms (e2e)', () => {
       });
     });
   });
+
+  describe('GET /api/study-rooms/:id/visits', () => {
+    async function createStudent(name: string, phone: string): Promise<number> {
+      const res = await api().post('/api/students').send({ name, phone }).expect(201);
+      return res.body.data.id as number;
+    }
+
+    async function apply(studentId: number, roomId: number, startAt: string, endAt: string) {
+      const res = await api()
+        .post(`/api/students/${studentId}/visits`)
+        .send({ studyRoomId: roomId, startAt, endAt })
+        .expect(201);
+      return res.body.data.id as number;
+    }
+
+    it('유효 신청만 방문 시작 순으로, 학생 연락처와 함께 준다', async () => {
+      const roomId = await createRoom({ maxPersonnel: 5 });
+      // 동명이인
+      const a = await createStudent('김하늘', '010-1111-1111');
+      const b = await createStudent('김하늘', '01056567878');
+      const c = await createStudent('이도윤', '010-3333-3333');
+      await apply(a, roomId, '2030-01-10T13:00:00+09:00', '2030-01-10T15:00:00+09:00');
+      await apply(b, roomId, '2030-01-10T10:00:00+09:00', '2030-01-10T12:00:00+09:00');
+      const canceled = await apply(
+        c,
+        roomId,
+        '2030-01-10T11:00:00+09:00',
+        '2030-01-10T12:00:00+09:00',
+      );
+      await api().post(`/api/students/${c}/visits/${canceled}/cancel`).expect(200);
+
+      const res = await api().get(`/api/study-rooms/${roomId}/visits`).expect(200);
+      expect(res.body.data).toEqual([
+        expect.objectContaining({
+          student: { id: b, name: '김하늘', phone: '010-5656-7878' },
+          startAt: '2030-01-10T10:00:00.000+09:00',
+          endAt: '2030-01-10T12:00:00.000+09:00',
+        }),
+        expect.objectContaining({
+          student: { id: a, name: '김하늘', phone: '010-1111-1111' },
+          startAt: '2030-01-10T13:00:00.000+09:00',
+        }),
+      ]);
+    });
+
+    it('취소 후 재신청하면 다시 나오고, 신청 시각은 재신청 시각이다', async () => {
+      const roomId = await createRoom();
+      const s = await createStudent('김하늘', '010-1111-1111');
+      const visitId = await apply(
+        s,
+        roomId,
+        '2030-01-10T10:00:00+09:00',
+        '2030-01-10T12:00:00+09:00',
+      );
+      const first = await prisma.visitHistory.findFirstOrThrow({ where: { visitId } });
+      await api().post(`/api/students/${s}/visits/${visitId}/cancel`).expect(200);
+      await apply(s, roomId, '2030-01-10T14:00:00+09:00', '2030-01-10T15:00:00+09:00');
+
+      const res = await api().get(`/api/study-rooms/${roomId}/visits`).expect(200);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0]).toMatchObject({
+        id: visitId,
+        startAt: '2030-01-10T14:00:00.000+09:00',
+      });
+      expect(new Date(res.body.data[0].appliedAt).getTime()).toBeGreaterThan(
+        first.createdAt.getTime(),
+      );
+    });
+
+    it('삭제된 학생의 신청은 자동 취소되어 빠진다', async () => {
+      const roomId = await createRoom();
+      const s = await createStudent('김하늘', '010-1111-1111');
+      await apply(s, roomId, '2030-01-10T10:00:00+09:00', '2030-01-10T12:00:00+09:00');
+      await api().delete(`/api/students/${s}`).expect(204);
+
+      const res = await api().get(`/api/study-rooms/${roomId}/visits`).expect(200);
+      expect(res.body.data).toEqual([]);
+    });
+
+    it('없거나 삭제된 자습실은 STUDY_ROOM_NOT_FOUND', async () => {
+      const roomId = await createRoom();
+      await api().delete(`/api/study-rooms/${roomId}`).expect(204);
+      const res = await api().get(`/api/study-rooms/${roomId}/visits`).expect(404);
+      expect(res.body.error.code).toBe('STUDY_ROOM_NOT_FOUND');
+      await api().get('/api/study-rooms/99999/visits').expect(404);
+    });
+  });
 });

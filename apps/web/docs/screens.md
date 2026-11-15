@@ -81,7 +81,7 @@
  ● 11.14 08:00  시스템  자동 취소  사유: 운영 기간 변경
 ```
 
-- 신청자 탭은 별도 API 없이 이력에서 방문별 마지막 이벤트가 취소가 아닌 것을 계산해 보여줍니다(`utils/history.ts`). 연락처는 이력 응답에 없어 이름·방문 시간·신청일만 보여줍니다.
+- 신청자 탭은 `GET /study-rooms/:id/visits`(유효 신청 + 학생 연락처, 방문 시작 순)로 보여줍니다. 동명이인을 구분할 수 있도록 강사 화면에서는 연락처 전체를 보여줍니다 (#28).
 - 이력 항목(HistoryTimeline)은 `VisitHistory`의 `action`(APPLY/UPDATE/CANCEL), `actorType`(STUDENT/INSTRUCTOR/SYSTEM), `prevStartAt→startAt`, `reason`을 그대로 표현합니다. 수정은 "이전 → 이후"를 한 줄에 보여줍니다.
 - 이력 필터: 전체 / 신청 / 변경 / 취소. 학생 이름으로 좁히기.
 - error: 삭제된 자습실(404)이면 "삭제된 자습실이에요" + [목록으로].
