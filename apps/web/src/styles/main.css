@@ -1,0 +1,128 @@
+@import 'tailwindcss';
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * 디자인 토큰 — apps/web/docs/design-system.md
+ * Tailwind 기본 팔레트·크기·모서리·그림자를 지우고 의미 토큰만 남긴다.
+ */
+@theme {
+  --color-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+
+  --font-sans: 'Pretendard Variable', Pretendard, system-ui, sans-serif;
+
+  /* 기본 */
+  --color-white: oklch(100% 0 0);
+  --color-black: oklch(0% 0 0);
+  --color-canvas: oklch(98.5% 0.004 95);
+  --color-surface: oklch(100% 0 0);
+  --color-sunken: oklch(96.5% 0.005 95);
+  --color-line: oklch(90% 0.006 95);
+  --color-line-strong: oklch(78% 0.008 95);
+  --color-fg: oklch(22% 0.01 260);
+  --color-fg-muted: oklch(48% 0.01 260);
+  --color-accent: oklch(50% 0.13 250);
+  --color-accent-fg: oklch(99% 0 0);
+  --color-focus: oklch(50% 0.13 250);
+
+  /* 상태 (텍스트로 쓸 때도 흰 배경 대비 4.5:1 이상) */
+  --color-status-open: oklch(50% 0.11 155);
+  --color-status-warn: oklch(55% 0.13 65);
+  --color-status-full: oklch(50% 0.16 25);
+  --color-status-applied: oklch(50% 0.13 250);
+  --color-status-canceled: oklch(50% 0.01 260);
+  --color-status-ended: oklch(50% 0.01 260);
+  --color-status-danger: oklch(50% 0.18 27);
+
+  /* 타이포 */
+  --text-title: 1.5rem;
+  --text-title--line-height: 2rem;
+  --text-title--font-weight: 700;
+  --text-title--letter-spacing: -0.01em;
+  --text-heading: 1.125rem;
+  --text-heading--line-height: 1.625rem;
+  --text-heading--font-weight: 600;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.5rem;
+  --text-body--font-weight: 400;
+  --text-label: 0.875rem;
+  --text-label--line-height: 1.25rem;
+  --text-label--font-weight: 500;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.125rem;
+  --text-caption--font-weight: 400;
+
+  /* 모양 */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  --shadow-overlay: 0 8px 24px oklch(22% 0.01 260 / 0.12), 0 1px 3px oklch(22% 0.01 260 / 0.08);
+  --container-content: 60rem;
+  --container-dialog: 28rem;
+  /* 다이얼로그 최대 높이: 화면 위아래 16px 여백 */
+  --spacing-dialog-h: calc(100dvh - 2rem);
+
+  /* 모션 */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --animate-fade-in: fade-in 200ms var(--ease-standard);
+  --animate-fade-out: fade-out 120ms var(--ease-standard);
+  --animate-dialog-in: dialog-in 200ms var(--ease-standard);
+  --animate-highlight: highlight 1.2s var(--ease-standard);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.99);
+    }
+  }
+  @keyframes highlight {
+    from {
+      background-color: oklch(50% 0.13 250 / 0.08);
+    }
+  }
+}
+
+@layer base {
+  html {
+    @apply bg-canvas font-sans text-body text-fg antialiased;
+  }
+
+  body {
+    @apply min-h-dvh;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-focus;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      transition-duration: 1ms !important;
+    }
+  }
+}
