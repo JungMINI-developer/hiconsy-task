@@ -30,7 +30,9 @@ const { toasts, dismiss } = useToast();
         <X class="size-4" aria-hidden="true" />
       </ToastClose>
     </ToastRoot>
+    <!-- 기본 이름이 영어(Notifications (F8))라 스크린 리더용으로 한국어 이름을 준다 -->
     <ToastViewport
+      label="알림 ({hotkey})"
       class="fixed right-0 bottom-0 z-50 m-0 flex w-full max-w-sm list-none flex-col gap-2 p-4 outline-none"
     />
   </ToastProvider>
