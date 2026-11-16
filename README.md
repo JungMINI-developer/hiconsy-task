@@ -166,7 +166,7 @@ docs/               # 상세 문서
 - 아키텍처 (인프라, 소스 코드 구조, 요청 흐름): [docs/architecture.md](./docs/architecture.md)
 - 컨벤션 (브랜치 전략, 커밋, 코드 스타일): [CONTRIBUTING.md](./CONTRIBUTING.md)
 - 문제 해결 기록 (문제·선택지·검증): [docs/solutions](./docs/solutions/)
-  - [정원 마지막 자리의 동시 신청 처리](./docs/solutions/study-room-capacity-concurrency.md) — 자습실 행 락, 대안 비교, 공정성
+  - [정원 마감 직전의 동시 신청 처리](./docs/solutions/study-room-capacity-concurrency.md) — 자습실 행 락, 대안 비교, 공정성
   - [방문 시간 겹침과 동시 요청 처리](./docs/solutions/visit-time-overlap-concurrency.md) — 학생 행 락 모드, 교착 상태
 - UI/UX 설계 (사용자 흐름, 화면 명세, 디자인 시스템, UI 구현 방식): [apps/web/docs](./apps/web/docs/README.md)
 
