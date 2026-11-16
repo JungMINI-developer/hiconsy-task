@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { CancelReason, cancelAppliedVisitsBySystem } from '../visits/visit-cancellation.js';
 import type { CreateStudentDto } from './dto/create-student.dto.js';
 import type { UpdateStudentDto } from './dto/update-student.dto.js';
+import { lockStudyRoom } from '../study-rooms/study-room-lock.js';
 import { lockStudent, studentNotFound } from './student-lock.js';
 import { toStudent } from './student.mapper.js';
 
@@ -49,13 +50,23 @@ export class StudentsService {
    * FR-STD-02: Soft Delete.
    * 유효 신청은 자동 취소하고 이력에 SYSTEM 주체와 "학생 삭제" 사유를 남긴다.
    *
-   * 락: 학생 행(FOR NO KEY UPDATE). FOR UPDATE로 잡으면 자습실 삭제가 이 학생의 이력을 넣을 때
-   * FK 검사(FOR KEY SHARE)와 충돌한다. 이 삭제도 취소 이력을 넣으며 자습실 FK 검사를 하므로
-   * "학생 삭제는 자습실 락을, 자습실 삭제는 학생 락을" 기다리는 교착 상태가 된다.
+   * 락: 학생 행(FOR NO KEY UPDATE) → 신청한 자습실 행(id 순, FOR UPDATE).
+   * - 자습실 락 없이 신청 행을 먼저 바꾸면, 같은 신청을 취소하려는 자습실 삭제와
+   *   "학생 삭제는 이력 FK 검사로 자습실 락을, 자습실 삭제는 신청 행 락을" 기다리는 교착 상태가 된다.
+   * - 학생 행을 FOR UPDATE로 잡으면 자습실 삭제가 이 학생의 이력을 넣을 때 FK 검사(FOR KEY SHARE)와
+   *   충돌해 역시 교착 상태가 된다.
    */
   async remove(id: number): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await lockStudent(tx, id, 'noKeyUpdate');
+
+      const visits = await tx.visit.findMany({
+        where: { studentId: id, status: 'APPLIED' },
+        select: { studyRoomId: true },
+      });
+      const roomIds = [...new Set(visits.map((v) => v.studyRoomId))].sort((a, b) => a - b);
+      // 이미 삭제된 자습실은 락을 잡을 필요가 없다 (그 신청은 자습실 삭제가 취소했다)
+      for (const roomId of roomIds) await lockStudyRoom(tx, roomId).catch(() => undefined);
 
       const now = new Date();
       await cancelAppliedVisitsBySystem(tx, { studentId: id }, CancelReason.STUDENT_DELETED, now);

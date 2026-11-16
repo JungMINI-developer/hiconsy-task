@@ -619,5 +619,27 @@ describe('Visits (e2e)', () => {
         expect(visit.status).toBe('CANCELED');
       }
     });
+
+    it('학생 삭제와 그 학생이 신청한 자습실 삭제가 동시에 일어나도 교착 상태 없이 처리된다', async () => {
+      // 둘 다 같은 신청을 자동 취소한다. 학생 삭제가 자습실 락 없이 신청 행을 먼저 바꾸면
+      // "학생 삭제는 이력 FK 검사로 자습실 락을, 자습실 삭제는 신청 행 락을" 기다려 교착 상태가 된다.
+      for (let i = 0; i < 10; i += 1) {
+        await resetDatabase(prisma);
+        const roomId = await createRoom({ maxPersonnel: 5 });
+        const studentId = await createStudent();
+        const visitId = await applyOk(studentId, roomId);
+
+        const [delStudent, delRoom] = await Promise.all([
+          api().delete(`/api/students/${studentId}`),
+          api().delete(`/api/study-rooms/${roomId}`),
+        ]);
+
+        expect([delStudent.status, delRoom.status]).toEqual([204, 204]);
+        const visit = await prisma.visit.findUniqueOrThrow({ where: { id: visitId } });
+        expect(visit.status).toBe('CANCELED');
+        // 자동 취소 이력은 한 번만 남는다
+        expect(await prisma.visitHistory.count({ where: { visitId, action: 'CANCEL' } })).toBe(1);
+      }
+    });
   });
 });
