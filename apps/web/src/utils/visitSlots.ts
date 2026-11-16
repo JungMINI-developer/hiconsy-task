@@ -4,10 +4,33 @@
  * - 구간 전체가 운영 기간 안 (requirements 9절 #1)
  * - 시작은 지금 이후 (#6)
  * - 방문은 하루 안으로 제한 (UI 제약, screens.md S-22)
+ * - 내 다른 유효 신청과 겹치지 않음 (#13) — 선택지는 남기고 비활성화한다
  */
 import { toDateInputValue, toTimeValue } from './datetime';
 
-const SLOT_MS = 30 * 60 * 1000;
+export const SLOT_MS = 30 * 60 * 1000;
+
+/** 이미 신청해 둔 다른 방문 구간 (겹치면 고를 수 없다) */
+export interface BusyRange {
+  startAt: Date;
+  endAt: Date;
+  /** 겹칠 때 보여줄 자습실 이름 */
+  label: string;
+}
+
+/**
+ * [startAt, endAt)과 겹치는 첫 구간.
+ * 반열린 구간이라 19~21시 다음 21~22시처럼 맞닿는 구간은 겹치지 않는다 (서버와 같은 기준).
+ */
+export function findOverlap(
+  startAt: Date,
+  endAt: Date,
+  busy: readonly BusyRange[],
+): BusyRange | undefined {
+  return busy.find(
+    (b) => b.startAt.getTime() < endAt.getTime() && startAt.getTime() < b.endAt.getTime(),
+  );
+}
 
 export interface Period {
   startDate: string;

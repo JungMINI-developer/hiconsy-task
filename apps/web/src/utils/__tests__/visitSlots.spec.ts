@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  findOverlap,
   hasAvailableSlot,
   slotToDate,
   visitDateOptions,
@@ -63,5 +64,27 @@ describe('visitSlots', () => {
   it('남은 시간이 없으면 신청할 수 없다', () => {
     expect(hasAvailableSlot(period, new Date('2026-11-20T21:40:00+09:00'))).toBe(false);
     expect(hasAvailableSlot(period, before)).toBe(true);
+  });
+});
+
+describe('findOverlap', () => {
+  const at = (time: string) => new Date(`2026-11-20T${time}:00+09:00`);
+  const busy = [{ startAt: at('19:00'), endAt: at('21:00'), label: 'A 자습실' }];
+
+  it('구간이 일부라도 겹치면 그 신청을 돌려준다', () => {
+    expect(findOverlap(at('20:00'), at('22:00'), busy)?.label).toBe('A 자습실');
+    expect(findOverlap(at('18:00'), at('19:30'), busy)?.label).toBe('A 자습실');
+    // 감싸거나 안에 들어가도 겹침
+    expect(findOverlap(at('18:00'), at('22:00'), busy)).toBeDefined();
+    expect(findOverlap(at('19:30'), at('20:00'), busy)).toBeDefined();
+  });
+
+  it('맞닿는 구간은 겹치지 않는다 (서버와 같은 반열린 구간)', () => {
+    expect(findOverlap(at('21:00'), at('22:00'), busy)).toBeUndefined();
+    expect(findOverlap(at('17:00'), at('19:00'), busy)).toBeUndefined();
+  });
+
+  it('다른 신청이 없으면 겹치지 않는다', () => {
+    expect(findOverlap(at('19:00'), at('21:00'), [])).toBeUndefined();
   });
 });

@@ -17,6 +17,8 @@ const MESSAGES: Record<string, string> = {
   [ErrorCode.VISIT_OUT_OF_PERIOD]: '운영 기간 안에서 골라 주세요',
   [ErrorCode.ALREADY_APPLIED]:
     '이미 신청한 자습실이에요. 시간을 바꾸려면 내 신청에서 변경해 주세요',
+  [ErrorCode.VISIT_TIME_OVERLAP]:
+    '같은 시간에 신청한 다른 자습실이 있어요. 겹치지 않는 시간을 골라 주세요',
   [ErrorCode.CAPACITY_FULL]: '방금 정원이 다 찼어요. 다른 자습실을 골라 주세요',
   [ErrorCode.VISIT_ALREADY_CANCELED]: '이미 취소한 신청이에요',
   [ErrorCode.VISIT_ALREADY_STARTED]: '이미 시작한 방문은 바꾸거나 취소할 수 없어요',

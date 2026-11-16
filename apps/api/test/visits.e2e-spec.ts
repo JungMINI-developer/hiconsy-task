@@ -183,6 +183,97 @@ describe('Visits (e2e)', () => {
     });
   });
 
+  describe('다른 자습실과 방문 시간 겹침', () => {
+    it('같은 학생이 다른 자습실에 겹치는 시간으로 신청하면 VISIT_TIME_OVERLAP', async () => {
+      const studentId = await createStudent();
+      const roomA = await createRoom({ name: 'A 자습실' });
+      const roomB = await createRoom({ name: 'B 자습실' });
+      await applyOk(studentId, roomA); // 19~21시
+
+      const res = await apply(studentId, roomB, {
+        startAt: '2030-01-10T20:00:00+09:00',
+        endAt: '2030-01-10T22:00:00+09:00',
+      }).expect(409);
+      expect(res.body.error).toMatchObject({
+        code: 'VISIT_TIME_OVERLAP',
+        message: expect.stringContaining('A 자습실'),
+      });
+      expect(await prisma.visit.count({ where: { studyRoomId: roomB } })).toBe(0);
+    });
+
+    it('기존 신청을 완전히 감싸는 구간도 겹침이다', async () => {
+      const studentId = await createStudent();
+      const [roomA, roomB] = [await createRoom(), await createRoom()];
+      await applyOk(studentId, roomA); // 19~21시
+
+      const res = await apply(studentId, roomB, {
+        startAt: '2030-01-10T18:00:00+09:00',
+        endAt: '2030-01-10T22:00:00+09:00',
+      }).expect(409);
+      expect(res.body.error.code).toBe('VISIT_TIME_OVERLAP');
+    });
+
+    it('이어지는 구간(앞 신청의 종료 = 새 신청의 시작)은 허용한다', async () => {
+      const studentId = await createStudent();
+      const [roomA, roomB, roomC] = [await createRoom(), await createRoom(), await createRoom()];
+      await applyOk(studentId, roomA); // 19~21시
+
+      await applyOk(studentId, roomB, {
+        startAt: '2030-01-10T21:00:00+09:00',
+        endAt: '2030-01-10T22:00:00+09:00',
+      });
+      await applyOk(studentId, roomC, {
+        startAt: '2030-01-10T17:00:00+09:00',
+        endAt: '2030-01-10T19:00:00+09:00',
+      });
+    });
+
+    it('다른 학생과는 겹쳐도 되고, 취소한 신청과는 겹쳐도 된다', async () => {
+      const [a, b] = [await createStudent(), await createStudent()];
+      const [roomA, roomB] = [await createRoom(), await createRoom()];
+      const visitA = await applyOk(a, roomA);
+      await applyOk(b, roomB);
+
+      await api().post(`/api/students/${a}/visits/${visitA}/cancel`).expect(200);
+      await applyOk(a, roomB);
+    });
+
+    it('재신청도 다른 자습실의 유효 신청과 겹치면 막는다', async () => {
+      const studentId = await createStudent();
+      const [roomA, roomB] = [await createRoom(), await createRoom()];
+      const visitA = await applyOk(studentId, roomA);
+      await api().post(`/api/students/${studentId}/visits/${visitA}/cancel`).expect(200);
+      await applyOk(studentId, roomB);
+
+      const res = await apply(studentId, roomA).expect(409);
+      expect(res.body.error.code).toBe('VISIT_TIME_OVERLAP');
+      expect(await historyActions(visitA)).toEqual(['APPLY:STUDENT', 'CANCEL:STUDENT']);
+    });
+
+    it('시간 수정은 자기 자신을 빼고 검사하고, 다른 자습실 신청과 겹치면 막는다', async () => {
+      const studentId = await createStudent();
+      const [roomA, roomB] = [await createRoom(), await createRoom()];
+      const visitA = await applyOk(studentId, roomA); // 19~21시
+      await applyOk(studentId, roomB, {
+        startAt: '2030-01-10T10:00:00+09:00',
+        endAt: '2030-01-10T12:00:00+09:00',
+      });
+
+      // 자기 구간과 겹치게 늘리는 건 허용
+      await api()
+        .patch(`/api/students/${studentId}/visits/${visitA}`)
+        .send({ startAt: '2030-01-10T19:30:00+09:00', endAt: '2030-01-10T21:30:00+09:00' })
+        .expect(200);
+
+      const res = await api()
+        .patch(`/api/students/${studentId}/visits/${visitA}`)
+        .send({ startAt: '2030-01-10T11:00:00+09:00', endAt: '2030-01-10T13:00:00+09:00' })
+        .expect(409);
+      expect(res.body.error.code).toBe('VISIT_TIME_OVERLAP');
+      expect(await historyActions(visitA)).toEqual(['APPLY:STUDENT', 'UPDATE:STUDENT']);
+    });
+  });
+
   describe('PATCH /api/students/:studentId/visits/:visitId (시간 수정)', () => {
     it('방문 시간을 바꾸고 변경 전후를 UPDATE 이력에 남긴다', async () => {
       const studentId = await createStudent();
@@ -405,6 +496,65 @@ describe('Visits (e2e)', () => {
         where: { studyRoomId: roomId, status: 'APPLIED' },
       });
       expect(applied).toBeLessThanOrEqual(room.maxPersonnel);
+    });
+
+    it('같은 학생이 여러 자습실에 같은 시간으로 동시에 신청해도 1건만 성공한다', async () => {
+      const studentId = await createStudent();
+      const rooms = await Promise.all(Array.from({ length: 5 }, () => createRoom()));
+
+      const results = await Promise.all(rooms.map((roomId) => apply(studentId, roomId)));
+
+      expect(results.filter((res) => res.status === 201)).toHaveLength(1);
+      expect(results.filter((res) => res.status !== 201).map((res) => res.body.error.code)).toEqual(
+        Array(4).fill('VISIT_TIME_OVERLAP'),
+      );
+      expect(await prisma.visit.count({ where: { studentId, status: 'APPLIED' } })).toBe(1);
+    });
+
+    it('같은 학생이 두 신청을 서로 겹치게 동시에 수정해도 1건만 성공한다', async () => {
+      const studentId = await createStudent();
+      const [roomA, roomB] = [await createRoom(), await createRoom()];
+      const visitA = await applyOk(studentId, roomA); // 19~21시
+      const visitB = await applyOk(studentId, roomB, {
+        startAt: '2030-01-10T10:00:00+09:00',
+        endAt: '2030-01-10T12:00:00+09:00',
+      });
+
+      const target = { startAt: '2030-01-10T15:00:00+09:00', endAt: '2030-01-10T17:00:00+09:00' };
+      const results = await Promise.all(
+        [visitA, visitB].map((id) =>
+          api().patch(`/api/students/${studentId}/visits/${id}`).send(target),
+        ),
+      );
+
+      expect(results.filter((res) => res.status === 200)).toHaveLength(1);
+      expect(results.filter((res) => res.status !== 200).map((res) => res.body.error.code)).toEqual(
+        ['VISIT_TIME_OVERLAP'],
+      );
+    });
+
+    it('시간 수정과 그 신청의 자습실 삭제가 동시에 일어나도 교착 상태 없이 처리된다', async () => {
+      // 자습실 삭제는 자습실 락을 잡은 채 이력을 넣으며 학생 행에 FK 검사(FOR KEY SHARE)를 건다.
+      // 시간 수정이 학생 행을 FOR UPDATE로 잡으면 서로를 기다려 교착 상태가 된다.
+      for (let i = 0; i < 10; i += 1) {
+        await resetDatabase(prisma);
+        const studentId = await createStudent();
+        const roomId = await createRoom();
+        const visitId = await applyOk(studentId, roomId);
+
+        const [patch, remove] = await Promise.all([
+          api()
+            .patch(`/api/students/${studentId}/visits/${visitId}`)
+            .send({ startAt: '2030-01-10T20:00:00+09:00', endAt: '2030-01-10T22:00:00+09:00' }),
+          api().delete(`/api/study-rooms/${roomId}`),
+        ]);
+
+        expect(remove.status).toBe(204);
+        // 수정이 먼저면 성공, 삭제가 먼저면 자습실이 없다
+        expect([200, 404]).toContain(patch.status);
+        const visit = await prisma.visit.findUniqueOrThrow({ where: { id: visitId } });
+        expect(visit.status).toBe('CANCELED');
+      }
     });
   });
 });

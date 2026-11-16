@@ -3,7 +3,7 @@ import { ErrorCode, type Visit } from '@hiconsy/shared';
 import { DomainException } from '../common/exceptions/domain.exception.js';
 import type { Prisma, StudyRoom, Visit as VisitRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { lockStudent, studentNotFound } from '../students/student-lock.js';
+import { lockStudent, studentNotFound, type StudentLockMode } from '../students/student-lock.js';
 import { lockStudyRoom } from '../study-rooms/study-room-lock.js';
 import type { CreateVisitDto } from './dto/create-visit.dto.js';
 import type { UpdateVisitDto } from './dto/update-visit.dto.js';
@@ -13,7 +13,8 @@ import { toVisit } from './visit.mapper.js';
  * 학생의 방문 신청·수정·취소.
  *
  * 모든 변경은 하나의 트랜잭션에서 다음 순서로 처리한다.
- * 1. 학생 행 FOR SHARE: 동시에 진행되는 학생 삭제와 직렬화
+ * 1. 학생 행 락: 학생 삭제와 직렬화. 신청·시간 수정은 FOR NO KEY UPDATE로 같은 학생의
+ *    신청끼리도 직렬화한다 (다른 자습실과의 시간 겹침 보장, student-lock.ts 참고)
  * 2. 자습실 행 FOR UPDATE: 같은 자습실의 신청·수정·취소, 자습실 수정·삭제와 직렬화 (정원 보장)
  * 3. 규칙 검사 → visits 변경 → visit_histories 기록
  */
@@ -39,7 +40,7 @@ export class VisitsService {
     const endAt = new Date(dto.endAt);
 
     return this.prisma.$transaction(async (tx) => {
-      await lockStudent(tx, studentId, 'share');
+      await lockStudent(tx, studentId, 'noKeyUpdate');
       await lockStudyRoom(tx, dto.studyRoomId);
       const room = await tx.studyRoom.findUniqueOrThrow({ where: { id: dto.studyRoomId } });
 
@@ -55,6 +56,8 @@ export class VisitsService {
           HttpStatus.CONFLICT,
         );
       }
+
+      await assertNoOverlap(tx, studentId, startAt, endAt);
 
       const appliedCount = await tx.visit.count({
         where: { studyRoomId: room.id, status: 'APPLIED' },
@@ -100,13 +103,15 @@ export class VisitsService {
     const endAt = new Date(dto.endAt);
 
     return this.prisma.$transaction(async (tx) => {
-      const { visit, room } = await this.lockOwnVisit(tx, studentId, visitId);
+      const { visit, room } = await this.lockOwnVisit(tx, studentId, visitId, 'noKeyUpdate');
       assertChangeable(visit);
       assertValidVisitTime(startAt, endAt, room);
 
       const unchanged =
         visit.startAt.getTime() === startAt.getTime() && visit.endAt.getTime() === endAt.getTime();
       if (unchanged) return toVisit({ ...visit, studyRoom: room });
+
+      await assertNoOverlap(tx, studentId, startAt, endAt, visit.id);
 
       const updated = await tx.visit.update({
         where: { id: visit.id },
@@ -133,7 +138,8 @@ export class VisitsService {
   /** FR-VST-03: 취소 (정원 복원) */
   async cancel(studentId: number, visitId: number): Promise<Visit> {
     return this.prisma.$transaction(async (tx) => {
-      const { visit, room } = await this.lockOwnVisit(tx, studentId, visitId);
+      // 취소는 시간 겹침을 만들 수 없으므로 학생 삭제와만 직렬화한다
+      const { visit, room } = await this.lockOwnVisit(tx, studentId, visitId, 'share');
       assertChangeable(visit);
 
       const canceled = await tx.visit.update({
@@ -166,8 +172,9 @@ export class VisitsService {
     tx: Prisma.TransactionClient,
     studentId: number,
     visitId: number,
+    studentLock: StudentLockMode,
   ): Promise<{ visit: VisitRow; room: StudyRoom }> {
-    await lockStudent(tx, studentId, 'share');
+    await lockStudent(tx, studentId, studentLock);
     const target = await tx.visit.findFirst({ where: { id: visitId, studentId } });
     if (!target) throw visitNotFound();
 
@@ -217,6 +224,38 @@ function assertValidVisitTime(startAt: Date, endAt: Date, room: StudyRoom): void
       ErrorCode.VISIT_OUT_OF_PERIOD,
       '방문 시간은 자습실 운영 기간 안이어야 합니다.',
       HttpStatus.BAD_REQUEST,
+    );
+  }
+}
+
+/**
+ * 같은 학생의 다른 유효 신청과 방문 구간이 겹치면 안 된다 (requirements 9절 #13).
+ * 구간은 반열린 구간 [start, end)으로 보므로 19~21시 다음 21~22시처럼 이어지는 신청은 허용한다.
+ * 호출 전에 학생 행을 FOR NO KEY UPDATE로 잠가 같은 학생의 동시 신청과 직렬화해야 한다.
+ */
+async function assertNoOverlap(
+  tx: Prisma.TransactionClient,
+  studentId: number,
+  startAt: Date,
+  endAt: Date,
+  excludeVisitId?: number,
+): Promise<void> {
+  const overlapping = await tx.visit.findFirst({
+    where: {
+      studentId,
+      status: 'APPLIED',
+      ...(excludeVisitId !== undefined && { id: { not: excludeVisitId } }),
+      startAt: { lt: endAt },
+      endAt: { gt: startAt },
+    },
+    include: { studyRoom: { select: { name: true } } },
+    orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+  });
+  if (overlapping) {
+    throw new DomainException(
+      ErrorCode.VISIT_TIME_OVERLAP,
+      `같은 시간에 신청한 자습실(${overlapping.studyRoom.name})이 있습니다.`,
+      HttpStatus.CONFLICT,
     );
   }
 }
