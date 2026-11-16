@@ -10,15 +10,11 @@ interface NavItem {
   icon: Component;
   /** 메뉴 옆 개수 배지 (예: 학생의 유효 신청 수) */
   count?: number;
-  /** 확인이 필요한 일이 있다는 점 표시 (예: 자리 제안, #36) */
-  attention?: number;
 }
 
 const props = defineProps<{
   /** 학생의 유효 신청 수 — "내 신청" 메뉴에 배지로 붙는다 */
   activeVisitCount?: number;
-  /** 학생이 받은 자리 제안 수 — "내 신청" 메뉴에 점으로 표시 */
-  offerCount?: number;
 }>();
 
 const session = useSessionStore();
@@ -42,7 +38,6 @@ const nav = computed<NavItem[]>(() => {
         label: '내 신청',
         icon: CalendarCheck,
         count: props.activeVisitCount,
-        attention: props.offerCount,
       },
     ];
   }
@@ -77,13 +72,6 @@ const home = computed(() => nav.value[0]?.to ?? '/');
             class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-caption font-medium text-accent-fg tabular-nums"
           >
             <span class="sr-only">예정 방문</span>{{ item.count }}<span class="sr-only">건</span>
-          </span>
-          <span
-            v-if="item.attention"
-            class="size-2 rounded-full bg-status-warn"
-            data-testid="nav-attention"
-          >
-            <span class="sr-only">자리 제안 {{ item.attention }}건</span>
           </span>
         </RouterLink>
       </nav>

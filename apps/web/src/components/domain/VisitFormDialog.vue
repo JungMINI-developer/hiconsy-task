@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
-import { ErrorCode, type Visit, type WaitlistEntry } from '@hiconsy/shared';
+import { ErrorCode, type Visit } from '@hiconsy/shared';
 import { visitsApi } from '@/api/visits';
-import { waitlistApi } from '@/api/waitlist';
 import { AppError } from '@/api/client';
 import { useStudentGuard } from '@/composables/useStudentGuard';
 import { useToast } from '@/composables/useToast';
@@ -13,7 +12,6 @@ import {
   formatDate,
   formatDuration,
   formatRange,
-  formatTime,
   formatTimeRange,
   toDateInputValue,
   toIsoWithOffset,
@@ -44,12 +42,9 @@ export interface VisitRoom extends Period {
 }
 
 /**
- * S-22 방문 신청·시간 변경 다이얼로그. 같은 시간 선택 UI로 네 가지 일을 한다.
- * - 신청 / 시간 변경 (`visit`)
- * - 대기 등록 (`waitlist`, #36): 정원이 찬 자습실에 원하는 시간으로 줄을 선다
- * - 자리 확정 (`offer`, #36): 받은 자리 제안을 확정한다 (신청 API가 제안을 소비)
- * 운영 기간 밖·지난 시각은 선택지에서 아예 제외하고, 내 다른 신청과 겹치는 시각은 이유와 함께
- * 비활성화한다 (interaction-rules.md#방문-s-22). 대기는 백업 신청과 겹쳐도 되므로 막지 않고 안내만 한다.
+ * S-22 방문 신청·시간 변경 다이얼로그.
+ * 운영 기간 밖·지난 시각은 선택지에서 아예 제외하고,
+ * 내 다른 신청과 겹치는 시각은 이유와 함께 비활성화한다 (interaction-rules.md#방문-s-22).
  */
 const open = defineModel<boolean>('open', { required: true });
 
@@ -61,12 +56,6 @@ const props = defineProps<{
   remaining?: number;
   /** 신청 모드에서 미리 고를 시간 (고를 수 없는 값이면 무시하고 기본값) */
   initialSlot?: SlotValue | null;
-  /** 대기 등록 모드 (#36) */
-  waitlist?: boolean;
-  /** 대기 등록 모드에서 보여줄 현재 대기 인원 */
-  waitingCount?: number;
-  /** 있으면 자리 확정 모드 (#36) */
-  offer?: WaitlistEntry | null;
 }>();
 
 /** 정원이 차서 신청이 거절됨 — 거절된 자습실과 고른 시간 */
@@ -83,7 +72,6 @@ const emit = defineEmits<{
   /** 정원·기간이 바뀌어 목록을 다시 가져와야 함 */
   stale: [];
   full: [event: FullRoomEvent];
-  waited: [entry: WaitlistEntry];
 }>();
 
 const session = useSessionStore();
@@ -92,24 +80,6 @@ const toast = useToast();
 const handleStudentGone = useStudentGuard();
 
 const isEdit = computed(() => !!props.visit);
-const mode = computed<'update' | 'wait' | 'confirm' | 'apply'>(() => {
-  if (props.visit) return 'update';
-  if (props.waitlist) return 'wait';
-  if (props.offer) return 'confirm';
-  return 'apply';
-});
-const TITLE = {
-  update: '시간 변경',
-  wait: '대기 등록',
-  confirm: '자리 확정',
-  apply: '방문 신청',
-} as const;
-const SUBMIT = {
-  update: '변경하기',
-  wait: '대기 등록',
-  confirm: '확정하기',
-  apply: '신청하기',
-} as const;
 const period = computed<Period | null>(() => (props.visit ? props.visit.studyRoom : props.room));
 const roomName = computed(() => props.visit?.studyRoom.name ?? props.room?.name ?? '');
 
@@ -123,7 +93,7 @@ const formError = ref<{ message: string; showMyVisits?: boolean } | null>(null);
  * 내 다른 유효 신청 (시간을 바꾸는 신청 자신은 제외).
  * 같은 학생의 신청끼리는 시간이 겹칠 수 없다 (requirements 9절 #13).
  */
-const otherVisits = computed<BusyRange[]>(() => {
+const busy = computed<BusyRange[]>(() => {
   const now = Date.now();
   return myVisits.visits
     .filter(
@@ -136,8 +106,6 @@ const otherVisits = computed<BusyRange[]>(() => {
       label: v.studyRoom.name,
     }));
 });
-/** 선택지를 막는 기준. 대기는 백업 신청과 겹쳐도 되므로(#36) 막지 않는다 */
-const busy = computed<BusyRange[]>(() => (mode.value === 'wait' ? [] : otherVisits.value));
 
 /** 비활성 선택지 옆에 보여줄 이유 */
 const BUSY_HINT = '다른 신청';
@@ -264,13 +232,6 @@ const conflict = computed(() =>
     : undefined,
 );
 
-/** 대기 등록 시 내 신청과 겹치면 안내만 한다 (확정하려면 그 신청을 취소하거나 시간을 바꿔야 함) */
-const waitConflict = computed(() =>
-  mode.value === 'wait' && selected.value
-    ? findOverlap(selected.value.startAt, selected.value.endAt, otherVisits.value)
-    : undefined,
-);
-
 const unchanged = computed(
   () =>
     !!props.visit &&
@@ -289,14 +250,6 @@ async function submit() {
     endAt: toIsoWithOffset(selected.value.endAt),
   };
   try {
-    if (mode.value === 'wait') {
-      emit(
-        'waited',
-        await waitlistApi.register(studentId, { studyRoomId: props.room!.id, ...body }),
-      );
-      open.value = false;
-      return;
-    }
     const saved = props.visit
       ? await visitsApi.updateTime(studentId, props.visit.id, body)
       : await visitsApi.apply(studentId, { studyRoomId: props.room!.id, ...body });
@@ -315,15 +268,8 @@ function handleError(e: unknown) {
     return;
   }
   const code = e instanceof AppError ? e.code : null;
-  // 확정하는 사이 제안이 만료되어 다음 대기자에게 넘어감
-  if (code === ErrorCode.CAPACITY_FULL && mode.value === 'confirm') {
-    toast.error('자리 제안 시간이 지나 다음 대기자에게 넘어갔어요');
-    open.value = false;
-    emit('stale');
-    return;
-  }
   // 정원 마감: 닫고, 같은 시간에 자리가 남은 다른 자습실 안내는 화면이 맡는다 (#35)
-  if (code === ErrorCode.CAPACITY_FULL && mode.value === 'apply' && props.room && selected.value) {
+  if (code === ErrorCode.CAPACITY_FULL && !isEdit.value && props.room && selected.value) {
     emit('full', { room: props.room, ...selected.value, message: errorMessage(e) });
     open.value = false;
     return;
@@ -342,13 +288,7 @@ function handleError(e: unknown) {
     // 다른 탭·기기에서 신청해 내 신청 목록이 바뀐 경우: 다시 받아 선택지를 맞춘다
     case ErrorCode.ALREADY_APPLIED:
     case ErrorCode.VISIT_TIME_OVERLAP:
-    case ErrorCode.ALREADY_WAITING:
       formError.value = { message: errorMessage(e), showMyVisits: true };
-      emit('stale');
-      return;
-    // 대기하려는 사이 자리가 남음 → 다시 받아 바로 신청하게 한다
-    case ErrorCode.ROOM_HAS_SEATS:
-      formError.value = { message: errorMessage(e) };
       emit('stale');
       return;
     case ErrorCode.VISIT_OUT_OF_PERIOD:
@@ -369,7 +309,7 @@ function handleError(e: unknown) {
 <template>
   <AppDialog
     v-model:open="open"
-    :title="`${roomName} ${TITLE[mode]}`"
+    :title="`${roomName} ${isEdit ? '시간 변경' : '방문 신청'}`"
     :description="period ? `운영 ${formatRange(period.startDate, period.endDate)}` : undefined"
   >
     <form class="flex flex-col gap-5" novalidate @submit.prevent="submit">
@@ -444,29 +384,12 @@ function handleError(e: unknown) {
           </p>
           <p v-if="conflict" class="text-caption text-status-danger" role="alert">
             {{ conflict.label }} 신청({{ formatTimeRange(conflict.startAt, conflict.endAt) }})과
-            겹쳐요<template v-if="mode === 'confirm'"
-              >. 그 신청을 취소하거나 다른 시간을 골라 주세요</template
-            >
-          </p>
-          <p v-if="waitConflict" class="text-caption text-fg-muted">
-            {{ waitConflict.label }} 신청({{
-              formatTimeRange(waitConflict.startAt, waitConflict.endAt)
-            }})과 겹쳐요. 자리가 나서 확정하려면 그 신청을 취소하거나 시간을 바꿔야 해요
+            겹쳐요
           </p>
         </fieldset>
 
-        <p v-if="mode === 'apply' && remaining !== undefined" class="text-body">
+        <p v-if="!isEdit && remaining !== undefined" class="text-body">
           남은 자리 <span class="font-medium tabular-nums">{{ remaining }}</span>
-        </p>
-        <p v-if="mode === 'wait'" class="text-body">
-          <template v-if="waitingCount">
-            대기 <span class="font-medium tabular-nums">{{ waitingCount }}명</span> ·
-          </template>
-          자리가 나면 순번대로 10분 동안 자리를 잡아 드려요
-        </p>
-        <p v-if="mode === 'confirm' && offer?.offerExpiresAt" class="text-body">
-          <span class="font-medium tabular-nums">{{ formatTime(offer.offerExpiresAt) }}</span>까지
-          확정하면 자리가 내 것이 돼요
         </p>
         <p v-if="isEdit && visit" class="text-caption text-fg-muted">
           지금 신청한 시간: {{ formatDate(visit.startAt) }}
@@ -487,7 +410,7 @@ function handleError(e: unknown) {
           :loading="saving"
           :disabled="!selected || unchanged || !!conflict"
         >
-          {{ SUBMIT[mode] }}
+          {{ isEdit ? '변경하기' : '신청하기' }}
         </AppButton>
       </div>
     </form>

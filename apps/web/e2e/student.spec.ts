@@ -64,10 +64,7 @@ test.describe('학생 · 방문 신청', () => {
     );
   });
 
-  test('정원이 찬 자습실은 신청 대신 대기 등록을 보여주고 이유를 알려준다', async ({
-    page,
-    seed,
-  }) => {
+  test('정원이 찬 자습실은 신청 버튼이 비활성이고 이유를 보여준다', async ({ page, seed }) => {
     const room = await seed.room({ name: 'A 자습실', maxPersonnel: 1 });
     const other = await seed.student('이도윤', '010-2222-2222');
     await seed.visit(other.id, room.id, kst(1, 11), kst(1, 12));
@@ -77,16 +74,13 @@ test.describe('학생 · 방문 신청', () => {
     await page.goto('/student/rooms');
     const card = page.getByRole('listitem').filter({ hasText: 'A 자습실' });
     await expect(card).toContainText('정원 마감');
-    await expect(card.getByRole('button', { name: '방문 신청' })).toHaveCount(0);
-    await expect(card.getByRole('button', { name: '대기 등록' })).toHaveAccessibleDescription(
+    await expect(card.getByRole('button', { name: '방문 신청' })).toBeDisabled();
+    await expect(card.getByRole('button', { name: '방문 신청' })).toHaveAccessibleDescription(
       '정원이 다 찼어요',
     );
   });
 
-  test('다이얼로그를 연 사이 정원이 차면 알리고, 다른 자습실이 없으면 대기 등록을 안내한다', async ({
-    page,
-    seed,
-  }) => {
+  test('다이얼로그를 연 사이 정원이 차면 알려주고 목록을 갱신한다', async ({ page, seed }) => {
     const room = await seed.room({ name: 'A 자습실', maxPersonnel: 1 });
     const me = await seed.student('김하늘', '010-1111-1111');
     const other = await seed.student('이도윤', '010-2222-2222');
@@ -98,11 +92,8 @@ test.describe('학생 · 방문 신청', () => {
     await seed.visit(other.id, room.id, kst(1, 15), kst(1, 16)); // 다른 학생이 먼저
     await dialog.getByRole('button', { name: '신청하기' }).click();
 
+    await expect(toast(page, '방금 정원이 다 찼어요. 다른 자습실을 골라 주세요')).toBeVisible();
     await expect(dialog).toBeHidden();
-    const notice = page.getByRole('dialog', { name: 'A 자습실 정원이 방금 찼어요' });
-    await expect(notice).toContainText('자리가 남은 자습실이 없어요');
-    await expect(notice.getByRole('button', { name: '이 시간으로 대기 등록' })).toBeVisible();
-    await notice.getByRole('button', { name: '닫기' }).last().click();
     await expect(page.getByRole('listitem').filter({ hasText: 'A 자습실' })).toContainText(
       '정원 마감',
     );

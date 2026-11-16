@@ -9,7 +9,6 @@ import type { CreateVisitDto } from './dto/create-visit.dto.js';
 import type { UpdateVisitDto } from './dto/update-visit.dto.js';
 import { toVisit } from './visit.mapper.js';
 import { assertValidVisitTime } from './visit-time.js';
-import { syncWaitlist, syncWaitlistNow, WaitlistReason } from '../waitlist/waitlist-sync.js';
 
 /**
  * 학생의 방문 신청·수정·취소.
@@ -36,21 +35,15 @@ export class VisitsService {
     return visits.map(toVisit);
   }
 
-  /**
-   * FR-VST-01: 신청 또는 취소한 신청의 재신청.
-   * 이 자습실에서 자리 제안을 받은 학생이면 그 제안을 확정한다 (#36, 잡아 둔 자기 자리는 정원에서 뺀다).
-   */
+  /** FR-VST-01: 신청 또는 취소한 신청의 재신청 */
   async apply(studentId: number, dto: CreateVisitDto): Promise<Visit> {
     const startAt = new Date(dto.startAt);
     const endAt = new Date(dto.endAt);
-    // 정원 마감(409)으로 거절돼도 만료 정리·다음 순번 제안은 남도록 먼저 커밋한다
-    await syncWaitlistNow(this.prisma, dto.studyRoomId);
 
     return this.prisma.$transaction(async (tx) => {
       await lockStudent(tx, studentId, 'noKeyUpdate');
       await lockStudyRoom(tx, dto.studyRoomId);
       const room = await tx.studyRoom.findUniqueOrThrow({ where: { id: dto.studyRoomId } });
-      await syncWaitlist(tx, room);
 
       assertValidVisitTime(startAt, endAt, room);
 
@@ -67,17 +60,10 @@ export class VisitsService {
 
       await assertNoOverlap(tx, studentId, startAt, endAt);
 
-      // 정원 = 유효 신청 + 제안 중인 자리. 대기자가 남아 있으면 동기화로 빈자리가 모두 제안되어 있다 (대기자 우선)
       const appliedCount = await tx.visit.count({
         where: { studyRoomId: room.id, status: 'APPLIED' },
       });
-      const offeredCount = await tx.waitlistEntry.count({
-        where: { studyRoomId: room.id, status: 'OFFERED' },
-      });
-      const myOffer = await tx.waitlistEntry.findFirst({
-        where: { studentId, studyRoomId: room.id, status: 'OFFERED' },
-      });
-      if (appliedCount + offeredCount - (myOffer ? 1 : 0) >= room.maxPersonnel) {
+      if (appliedCount >= room.maxPersonnel) {
         throw new DomainException(
           ErrorCode.CAPACITY_FULL,
           `정원(${room.maxPersonnel}명)이 가득 찼습니다.`,
@@ -106,15 +92,8 @@ export class VisitsService {
           startAt,
           endAt,
           actorType: 'STUDENT',
-          reason: myOffer ? WaitlistReason.CONFIRMED : null,
         },
       });
-      if (myOffer) {
-        await tx.waitlistEntry.update({
-          where: { id: myOffer.id },
-          data: { status: 'CONFIRMED', endedAt: new Date(), endReason: WaitlistReason.CONFIRMED },
-        });
-      }
       return toVisit(visit);
     });
   }
@@ -182,8 +161,6 @@ export class VisitsService {
           actorType: 'STUDENT',
         },
       });
-      // 비워진 자리를 다음 대기자에게 제안한다 (#36)
-      await syncWaitlist(tx, room);
       return toVisit(canceled);
     });
   }

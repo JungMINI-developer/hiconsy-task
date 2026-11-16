@@ -6,8 +6,7 @@ export interface VisitRange {
   endAt: Date;
 }
 
-/** 새로 신청할 수 있는 자리 (대기자 몫을 뺀 값, #36) */
-const remaining = (room: StudyRoom) => room.availableSeats;
+const remaining = (room: StudyRoom) => room.maxPersonnel - room.currentPersonnel;
 
 /**
  * 정원이 차서 거절된 신청과 **같은 시간으로 바로 신청할 수 있는** 다른 자습실 (#35).

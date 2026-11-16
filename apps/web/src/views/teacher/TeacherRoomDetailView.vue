@@ -6,11 +6,9 @@ import {
   type StudyRoom,
   type StudyRoomHistory,
   type StudyRoomVisit,
-  type StudyRoomWaitlistEntry,
 } from '@hiconsy/shared';
 import { ChevronLeft, Search } from 'lucide-vue-next';
 import { studyRoomsApi } from '@/api/studyRooms';
-import { waitlistApi } from '@/api/waitlist';
 import { useAsync } from '@/composables/useAsync';
 import { useDialogQuery } from '@/composables/useDialogQuery';
 import { useRefetchOnVisible } from '@/composables/useRefetch';
@@ -18,7 +16,6 @@ import { useToast } from '@/composables/useToast';
 import {
   formatDate,
   formatRange,
-  formatTime,
   formatTimeRange,
   getRoomPhase,
   isSameDay,
@@ -30,7 +27,6 @@ import CapacityBar from '@/components/domain/CapacityBar.vue';
 import HistoryTimeline from '@/components/domain/HistoryTimeline.vue';
 import RoomPhaseBadge from '@/components/domain/RoomPhaseBadge.vue';
 import StudyRoomFormDialog from '@/components/domain/StudyRoomFormDialog.vue';
-import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
@@ -48,14 +44,12 @@ const router = useRouter();
 const toast = useToast();
 
 const detail = useAsync(async () => {
-  // 대기 조회가 서버의 제안 정리(만료·다음 순번)를 일으키므로 정원보다 먼저 받는다 (#36)
-  const waitlist = await waitlistApi.byRoom(props.id);
   const [room, histories, applicants] = await Promise.all([
     studyRoomsApi.get(props.id),
     studyRoomsApi.histories(props.id),
     studyRoomsApi.visits(props.id),
   ]);
-  return { room, histories, applicants, waitlist };
+  return { room, histories, applicants };
 });
 useRefetchOnVisible(detail.run);
 
@@ -64,22 +58,16 @@ const histories = computed<StudyRoomHistory[]>(() => detail.data.value?.historie
 const notFound = computed(() => detail.error.value?.code === ErrorCode.STUDY_ROOM_NOT_FOUND);
 
 // 탭은 URL 쿼리(?tab=)와 동기화 — 수정 다이얼로그의 [신청자 보기] 링크가 이 값을 쓴다
-type Tab = 'applicants' | 'waitlist' | 'histories';
+type Tab = 'applicants' | 'histories';
 const tab = computed<Tab>({
-  get: () =>
-    route.query.tab === 'histories' || route.query.tab === 'waitlist'
-      ? route.query.tab
-      : 'applicants',
+  get: () => (route.query.tab === 'histories' ? 'histories' : 'applicants'),
   set: (v) => void router.replace({ query: { ...route.query, tab: v } }),
 });
 
 /** 현재 유효 신청 — 서버가 학생 연락처와 함께 준다 (동명이인 구분) */
 const applicants = computed<StudyRoomVisit[]>(() => detail.data.value?.applicants ?? []);
-/** 진행 중 대기 — 제안 중 → 대기 순번 순 (#36) */
-const waitlist = computed<StudyRoomWaitlistEntry[]>(() => detail.data.value?.waitlist ?? []);
 const tabs = computed(() => [
   { value: 'applicants' as const, label: '신청자', count: applicants.value.length },
-  { value: 'waitlist' as const, label: '대기', count: waitlist.value.length },
   { value: 'histories' as const, label: '이력', count: histories.value.length },
 ]);
 
@@ -117,8 +105,7 @@ const deleteDescription = computed(() => {
     n > 0
       ? `신청한 학생 ${n}명의 신청이 모두 취소돼요. 학생은 내 신청에서 취소 사유를 볼 수 있어요.`
       : '아직 신청한 학생이 없어요. 삭제하면 목록에서 사라져요.';
-  const w = waitlist.value.length;
-  return `${room.value?.name ?? ''} · ${effect}${w > 0 ? ` 대기 ${w}명도 취소돼요.` : ''}`;
+  return `${room.value?.name ?? ''} · ${effect}`;
 });
 async function confirmDelete() {
   removing.value = true;
@@ -186,16 +173,7 @@ async function confirmDelete() {
         </div>
         <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-6">
           <dt class="w-20 shrink-0 text-label text-fg-muted">정원</dt>
-          <dd class="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <CapacityBar :current="room.currentPersonnel" :max="room.maxPersonnel" />
-            <span
-              v-if="room.offeredCount + room.waitingCount"
-              class="text-label text-fg-muted tabular-nums"
-            >
-              <template v-if="room.offeredCount">자리 제안 {{ room.offeredCount }}명 · </template
-              >대기 {{ room.waitingCount }}명
-            </span>
-          </dd>
+          <dd><CapacityBar :current="room.currentPersonnel" :max="room.maxPersonnel" /></dd>
         </div>
       </dl>
 
@@ -223,47 +201,6 @@ async function confirmDelete() {
                 </td>
                 <td class="hidden px-4 py-3 text-fg-muted tabular-nums sm:table-cell">
                   {{ formatDate(a.appliedAt) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- 대기 (#36) -->
-      <section v-else-if="tab === 'waitlist'" aria-label="대기">
-        <EmptyState
-          v-if="waitlist.length === 0"
-          title="대기 중인 학생이 없어요"
-          description="정원이 차면 학생이 원하는 시간으로 대기할 수 있어요"
-        />
-        <div v-else class="overflow-x-auto rounded-xl bg-surface">
-          <table class="w-full text-left text-body">
-            <thead class="border-b border-line text-label text-fg-muted">
-              <tr>
-                <th scope="col" class="px-4 py-2.5 font-medium">순서</th>
-                <th scope="col" class="px-4 py-2.5 font-medium">이름</th>
-                <th scope="col" class="px-4 py-2.5 font-medium">연락처</th>
-                <th scope="col" class="px-4 py-2.5 font-medium">원하는 시간</th>
-                <th scope="col" class="hidden px-4 py-2.5 font-medium sm:table-cell">등록일</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-line">
-              <tr v-for="w in waitlist" :key="w.id">
-                <td class="px-4 py-3 whitespace-nowrap tabular-nums">
-                  <AppBadge v-if="w.status === 'OFFERED'" tone="applied">
-                    자리 제안 ·
-                    {{ w.offerExpiresAt ? `${formatTime(w.offerExpiresAt)}까지` : '' }}
-                  </AppBadge>
-                  <template v-else>{{ w.position }}번째</template>
-                </td>
-                <td class="px-4 py-3 font-medium whitespace-nowrap">{{ w.student.name }}</td>
-                <td class="px-4 py-3 whitespace-nowrap tabular-nums">{{ w.student.phone }}</td>
-                <td class="px-4 py-3 whitespace-nowrap tabular-nums">
-                  {{ visitRange(w.startAt, w.endAt) }}
-                </td>
-                <td class="hidden px-4 py-3 text-fg-muted tabular-nums sm:table-cell">
-                  {{ formatDate(w.createdAt) }}
                 </td>
               </tr>
             </tbody>

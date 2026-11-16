@@ -7,7 +7,6 @@ import { CancelReason, cancelAppliedVisitsBySystem } from '../visits/visit-cance
 import type { CreateStudentDto } from './dto/create-student.dto.js';
 import type { UpdateStudentDto } from './dto/update-student.dto.js';
 import { lockStudyRoom } from '../study-rooms/study-room-lock.js';
-import { cancelActiveWaitlist, syncWaitlist, WaitlistReason } from '../waitlist/waitlist-sync.js';
 import { lockStudent, studentNotFound } from './student-lock.js';
 import { toStudent } from './student.mapper.js';
 
@@ -50,38 +49,27 @@ export class StudentsService {
   /**
    * FR-STD-02: Soft Delete.
    * 유효 신청은 자동 취소하고 이력에 SYSTEM 주체와 "학생 삭제" 사유를 남긴다.
-   * 진행 중 대기도 자동 취소하고, 비워진 자리는 각 자습실의 다음 대기자에게 제안한다 (#36).
    *
-   * 락: 학생 행(FOR NO KEY UPDATE) → 관련 자습실 행(id 순, FOR UPDATE).
-   * 학생 행을 FOR UPDATE로 잡으면, 자습실 삭제가 이 학생의 이력을 넣을 때 FK 검사(FOR KEY SHARE)와 충돌해
-   * "학생 삭제는 자습실 락을, 자습실 삭제는 학생 락을" 기다리는 교착 상태가 된다.
+   * 락: 학생 행(FOR NO KEY UPDATE) → 신청한 자습실 행(id 순, FOR UPDATE).
+   * - 자습실 락 없이 신청 행을 먼저 바꾸면, 같은 신청을 취소하려는 자습실 삭제와
+   *   "학생 삭제는 이력 FK 검사로 자습실 락을, 자습실 삭제는 신청 행 락을" 기다리는 교착 상태가 된다.
+   * - 학생 행을 FOR UPDATE로 잡으면 자습실 삭제가 이 학생의 이력을 넣을 때 FK 검사(FOR KEY SHARE)와
+   *   충돌해 역시 교착 상태가 된다.
    */
   async remove(id: number): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await lockStudent(tx, id, 'noKeyUpdate');
 
-      const [visits, waits] = await Promise.all([
-        tx.visit.findMany({
-          where: { studentId: id, status: 'APPLIED' },
-          select: { studyRoomId: true },
-        }),
-        tx.waitlistEntry.findMany({
-          where: { studentId: id, endedAt: null },
-          select: { studyRoomId: true },
-        }),
-      ]);
-      const roomIds = [...new Set([...visits, ...waits].map((r) => r.studyRoomId))].sort(
-        (a, b) => a - b,
-      );
+      const visits = await tx.visit.findMany({
+        where: { studentId: id, status: 'APPLIED' },
+        select: { studyRoomId: true },
+      });
+      const roomIds = [...new Set(visits.map((v) => v.studyRoomId))].sort((a, b) => a - b);
+      // 이미 삭제된 자습실은 락을 잡을 필요가 없다 (그 신청은 자습실 삭제가 취소했다)
       for (const roomId of roomIds) await lockStudyRoom(tx, roomId).catch(() => undefined);
 
       const now = new Date();
       await cancelAppliedVisitsBySystem(tx, { studentId: id }, CancelReason.STUDENT_DELETED, now);
-      await cancelActiveWaitlist(tx, { studentId: id }, WaitlistReason.STUDENT_DELETED, now);
-      for (const roomId of roomIds) {
-        const room = await tx.studyRoom.findUnique({ where: { id: roomId } });
-        if (room && !room.deletedAt) await syncWaitlist(tx, room, now);
-      }
       await tx.student.update({ where: { id }, data: { deletedAt: now } });
     });
   }

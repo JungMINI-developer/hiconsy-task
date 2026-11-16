@@ -5,7 +5,7 @@ import type { StudyRoom } from '../generated/prisma/client.js';
 
 /**
  * 방문 구간 검사: 시작 < 종료, 미래 시각, 자습실 운영 기간 안 (requirements 9절 #1·#6).
- * 방문 신청·시간 수정과 대기 등록(#36)이 함께 쓴다.
+ * 방문 신청과 시간 수정이 함께 쓴다.
  */
 export function assertValidVisitTime(
   startAt: Date,

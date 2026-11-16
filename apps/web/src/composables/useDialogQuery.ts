@@ -16,9 +16,8 @@ export function useDialogQuery(key: string, options: { clear?: string[] } = {}) 
     return typeof raw === 'string' && raw ? raw : null;
   });
 
-  /** @param extra 함께 넣을 쿼리 (예: 미리 고른 시간 `{ slot }`) */
-  function open(v: string | number = '1', extra: Record<string, string> = {}) {
-    void router.push({ query: { ...route.query, [key]: String(v), ...extra } });
+  function open(v: string | number = '1') {
+    void router.push({ query: { ...route.query, [key]: String(v) } });
   }
 
   function close() {

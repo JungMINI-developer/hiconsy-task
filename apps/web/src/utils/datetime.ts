@@ -143,11 +143,3 @@ export function formatDuration(start: DateInput, end: DateInput): string {
   const m = minutes % 60;
   return [h ? `${h}시간` : '', m ? `${m}분` : ''].filter(Boolean).join(' ');
 }
-
-/** 남은 시간 `M:SS` (자리 제안 확정 마감까지, #36). 지났으면 `0:00` */
-export function formatCountdown(until: DateInput, now: Date = new Date()): string {
-  const total = Math.max(Math.ceil((toDate(until).getTime() - now.getTime()) / 1000), 0);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
