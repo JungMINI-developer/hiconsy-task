@@ -61,7 +61,7 @@ export class StudyRoomsController {
   @ApiResponse({
     status: 409,
     description:
-      'CAPACITY_BELOW_CURRENT: 최대 인원 < 현재 신청 인원 / PERIOD_EXCLUDES_VISITS: 기간 밖 신청 존재',
+      'SEATS_IN_USE: 없어질 좌석에 끝나지 않은 예약 존재 / PERIOD_EXCLUDES_VISITS: 기간 밖 신청 존재',
   })
   update(
     @Param('id', ParseIntPipe) id: number,
