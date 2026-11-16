@@ -11,13 +11,11 @@ test.describe('토스트', () => {
     await enterAsStudent(page, me);
     await page.goto(`/student/rooms/${room.id}`);
 
-    // 한 페이지에서 연달아: 신청 → 시간 변경 (토스트는 4초 동안 남는다)
+    // 한 페이지에서 연달아: 신청 → 좌석 변경 (토스트는 4초 동안 남는다)
     await page.getByRole('button', { name: '신청하기' }).click();
-    await page.getByRole('button', { name: '시간 변경' }).click();
-    const edit = page.getByRole('dialog', { name: 'A 자습실 시간 변경' });
-    await pick(page, edit.getByRole('combobox', { name: '방문 시작 시각' }), '11:00');
-    await edit.getByRole('button', { name: '변경하기' }).click();
-    await expect(edit).toBeHidden();
+    await page.getByRole('button', { name: '좌석 변경' }).click();
+    await page.getByRole('radio', { name: '2번 좌석, 비어 있음' }).click();
+    await page.getByRole('button', { name: '변경하기' }).click();
 
     const items = page.getByRole('region', { name: /알림/ }).getByRole('listitem');
     await expect(items).toHaveCount(2);

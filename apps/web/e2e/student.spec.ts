@@ -8,7 +8,7 @@ const seatGroup = (page: Page) => page.getByRole('radiogroup', { name: '좌석' 
 const bottomBar = (page: Page) => page.getByTestId('room-action-bar');
 
 test.describe('학생 · 방문 신청', () => {
-  test('자습실 페이지에서 시간·좌석을 골라 신청 → 시간 변경 → 취소 → 다시 신청', async ({
+  test('자습실 페이지에서 시간·좌석을 골라 신청 → 변경 → 취소 → 다시 신청', async ({
     page,
     seed,
   }) => {
@@ -37,28 +37,37 @@ test.describe('학생 · 방문 신청', () => {
     await page.getByRole('button', { name: '신청하기' }).click();
 
     await expect(toast(page, /방문을 신청했어요\. .* 11:00 – 13:00/)).toBeVisible();
-    // 신청한 자습실이면 내 좌석을 보여주고, 하단 버튼은 [시간 변경]
+    // 신청한 자습실이면 내 시간·좌석을 보여주기만 하고, 하단 버튼은 [시간 변경]·[좌석 변경]
     await expect(bottomBar(page)).toContainText('내 방문 내일 11:00 – 13:00 · 3번 좌석');
     await expect(page.getByRole('button', { name: '신청하기' })).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: '방문 시작 시각' })).toHaveCount(0);
+    await expect(seats.getByRole('radio', { name: /3번 좌석.*내 좌석/ })).toBeChecked();
     await expect(nav(page).getByRole('link', { name: /내 신청.*1/ })).toBeVisible();
 
-    // 시간 변경 — 시간만 바꾸는 모달, 좌석은 그대로
+    // 시간 변경 → 변경 모드: 시간과 좌석을 함께 바꿀 수 있다 (아무것도 안 바꾸면 비활성)
     await page.getByRole('button', { name: '시간 변경' }).click();
-    const edit = page.getByRole('dialog', { name: 'A 자습실 시간 변경' });
-    await expect(edit).toContainText('좌석은 3번 좌석 그대로예요');
-    await expect(edit.getByRole('radiogroup')).toHaveCount(0);
-    await expect(edit.getByRole('button', { name: '변경하기' })).toBeDisabled();
-    await pick(page, edit.getByRole('combobox', { name: '방문 시작 시각' }), '12:00');
-    await edit.getByRole('button', { name: '변경하기' }).click();
-    await expect(toast(page, '방문 시간을 바꿨어요. 11:00 → 12:00')).toBeVisible();
-    await expect(bottomBar(page)).toContainText('내 방문 내일 12:00 – 13:00 · 3번 좌석');
+    await expect(page).toHaveURL(/edit=1/);
+    await expect(page.getByRole('combobox', { name: '방문 시작 시각' })).toBeFocused();
+    await expect(bottomBar(page)).toContainText('바꿀 시간이나 좌석을 골라 주세요');
+    await expect(page.getByRole('button', { name: '변경하기' })).toBeDisabled();
+    await pick(page, page.getByRole('combobox', { name: '방문 시작 시각' }), '12:00');
+    await seats.getByRole('radio', { name: '5번 좌석, 비어 있음' }).click();
+    await expect(bottomBar(page)).toContainText('3번 → 5번 좌석 · 11:00 – 13:00 → 12:00 – 13:00');
+    await page.getByRole('button', { name: '변경하기' }).click();
+    await expect(
+      toast(page, '방문을 바꿨어요. 3번 → 5번 좌석 · 11:00 – 13:00 → 12:00 – 13:00'),
+    ).toBeVisible();
+    await expect(page).not.toHaveURL(/edit=1/);
+    await expect(bottomBar(page)).toContainText('내 방문 내일 12:00 – 13:00 · 5번 좌석');
 
-    // 목록 카드에도 내 방문과 좌석이 보이고, 거기서도 시간 변경 모달을 연다
+    // 목록 카드에는 [변경] 하나 — 자습실 페이지 변경 모드로 간다
     await page.getByRole('link', { name: '자습실 목록' }).click();
-    await expect(card).toContainText('12:00 – 13:00 · 3번 좌석');
-    await card.getByRole('button', { name: '시간 변경' }).click();
-    await expect(page.getByRole('dialog', { name: 'A 자습실 시간 변경' })).toBeVisible();
-    await page.keyboard.press('Escape');
+    await expect(card).toContainText('12:00 – 13:00 · 5번 좌석');
+    await card.getByRole('link', { name: /변경/ }).click();
+    await expect(page).toHaveURL(/\/student\/rooms\/\d+\?edit=1/);
+    await expect(page.getByRole('button', { name: '변경하기' })).toBeVisible();
+    await page.getByRole('button', { name: '취소' }).click();
+    await expect(bottomBar(page)).toContainText('내 방문 내일 12:00 – 13:00 · 5번 좌석');
 
     // 취소 — 내 신청에서
     await nav(page)
@@ -67,20 +76,62 @@ test.describe('학생 · 방문 신청', () => {
     await expect(page).toHaveURL('/student/visits');
     const visit = page.getByRole('listitem').filter({ hasText: 'A 자습실' });
     await expect(visit).toContainText('12:00 – 13:00');
-    await expect(visit).toContainText('3번 좌석');
+    await expect(visit).toContainText('5번 좌석');
     await visit.getByRole('button', { name: '취소' }).click();
     const confirm = page.getByRole('alertdialog', { name: '방문을 취소할까요?' });
     await confirm.getByRole('button', { name: '방문 취소' }).click();
     await expect(toast(page, '방문을 취소했어요')).toBeVisible();
     await expect(page.getByText('아직 신청한 방문이 없어요')).toBeVisible();
 
-    // 다시 신청 — 자습실 페이지로 가고, 이전 좌석(3번)이 미리 골라져 있다
+    // 다시 신청 — 자습실 페이지로 가고, 이전 좌석(5번)이 미리 골라져 있다
     await page.getByRole('tab', { name: /취소됨/ }).click();
     await page.getByRole('link', { name: '다시 신청' }).click();
     await expect(page).toHaveURL(/\/student\/rooms\/\d+$/);
-    await expect(seatGroup(page).getByRole('radio', { name: '3번 좌석, 비어 있음' })).toBeChecked();
+    await expect(seatGroup(page).getByRole('radio', { name: '5번 좌석, 비어 있음' })).toBeChecked();
     await page.getByRole('button', { name: '신청하기' }).click();
     await expect(toast(page, /방문을 신청했어요/)).toBeVisible();
+  });
+
+  test('좌석 변경: 시간은 그대로 두고 좌석만 바꾼다', async ({ page, seed }) => {
+    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 5 });
+    const me = await seed.student('김하늘', '010-1111-1111');
+    await seed.visit(me.id, room.id, kst(1, 10), kst(1, 12)); // 1번 좌석
+    await enterAsStudent(page, me);
+
+    await page.goto(`/student/rooms/${room.id}`);
+    await page.getByRole('button', { name: '좌석 변경' }).click();
+    const seats = seatGroup(page);
+    // 좌석 현황의 내 좌석(고른 좌석)에 포커스 → 방향키로 옮긴다
+    await expect(seats.getByRole('radio', { name: /1번 좌석.*내 좌석/ })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(bottomBar(page)).toContainText('1번 → 2번 좌석');
+    await page.getByRole('button', { name: '변경하기' }).click();
+    await expect(toast(page, '방문을 바꿨어요. 1번 → 2번 좌석')).toBeVisible();
+    await expect(bottomBar(page)).toContainText('내 방문 내일 10:00 – 12:00 · 2번 좌석');
+  });
+
+  test('변경 모드에서 시간을 바꿔 지금 좌석이 차면 선택을 풀고 다른 좌석을 고르게 한다', async ({
+    page,
+    seed,
+  }) => {
+    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 2 });
+    const me = await seed.student('김하늘', '010-1111-1111');
+    const other = await seed.student('이도윤', '010-2222-2222');
+    await seed.visit(me.id, room.id, kst(1, 10), kst(1, 12)); // 1번 좌석
+    await seed.visit(other.id, room.id, kst(1, 14), kst(1, 16)); // 14~16시엔 1번이 빈다 → 1번
+    await enterAsStudent(page, me);
+
+    await page.goto(`/student/rooms/${room.id}?edit=1`);
+    await pick(page, page.getByRole('combobox', { name: '방문 시작 시각' }), '14:00');
+    await expect(
+      toast(page, '그 시간에는 다른 학생이 이미 예약한 좌석이에요. 다른 좌석을 골라 주세요'),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: '변경하기' })).toBeDisabled();
+    await seatGroup(page).getByRole('radio', { name: '2번 좌석, 비어 있음' }).click();
+    await page.getByRole('button', { name: '변경하기' }).click();
+    await expect(
+      toast(page, /방문을 바꿨어요\. 1번 → 2번 좌석 · 10:00 – 12:00 → 14:00 – 16:00/),
+    ).toBeVisible();
   });
 
   test('남은 시간 내내 빈 좌석이 없으면 신청할 수 없고 이유를 보여준다', async ({ page, seed }) => {
