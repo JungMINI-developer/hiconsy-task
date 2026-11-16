@@ -2,7 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
-import { createTestApp, resetDatabase } from './helpers.js';
+import { createRoomWithSeats, createTestApp, resetDatabase } from './helpers.js';
 
 /** 운영 기간: 2030-01-10 09:00 ~ 22:00 (KST) */
 const ROOM = {
@@ -40,8 +40,7 @@ describe('Visits (e2e)', () => {
   }
 
   async function createRoom(overrides: Partial<typeof ROOM> = {}): Promise<number> {
-    const room = await prisma.studyRoom.create({ data: { ...ROOM, ...overrides } });
-    return room.id;
+    return createRoomWithSeats(prisma, { ...ROOM, ...overrides });
   }
 
   function apply(studentId: number, studyRoomId: number, slot = SLOT) {

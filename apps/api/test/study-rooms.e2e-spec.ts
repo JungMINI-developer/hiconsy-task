@@ -39,13 +39,25 @@ describe('StudyRooms (e2e)', () => {
 
   let phoneSeq = 0;
 
-  /** 테스트용 방문 신청 (방문 API 구현 전이라 DB에 직접 생성) */
-  async function applyVisit(roomId: number, startAt: string, endAt: string, name = '학생') {
+  /** 테스트용 방문 신청 (방문 API 구현 전이라 DB에 직접 생성). seatNumber를 주면 그 좌석에 앉힌다 */
+  async function applyVisit(
+    roomId: number,
+    startAt: string,
+    endAt: string,
+    name = '학생',
+    seatNumber?: number,
+  ) {
     phoneSeq += 1;
     const phone = `010-0000-${String(phoneSeq).padStart(4, '0')}`;
     const student = await prisma.student.create({ data: { name, phone } });
+    const seat =
+      seatNumber === undefined
+        ? null
+        : await prisma.seat.findUniqueOrThrow({
+            where: { studyRoomId_number: { studyRoomId: roomId, number: seatNumber } },
+          });
     const visit = await prisma.visit.create({
-      data: { studentId: student.id, studyRoomId: roomId, startAt, endAt },
+      data: { studentId: student.id, studyRoomId: roomId, startAt, endAt, seatId: seat?.id },
     });
     await prisma.visitHistory.create({
       data: {
@@ -67,6 +79,24 @@ describe('StudyRooms (e2e)', () => {
         success: true,
         data: { ...room, currentPersonnel: 0 },
       });
+    });
+
+    it('최대 인원만큼 좌석 1~N번을 만든다', async () => {
+      const roomId = await createRoom({ maxPersonnel: 4 });
+      const seats = await prisma.seat.findMany({
+        where: { studyRoomId: roomId },
+        orderBy: { number: 'asc' },
+      });
+      expect(seats.map((s) => s.number)).toEqual([1, 2, 3, 4]);
+    });
+
+    it('최대 인원은 1~30명 (= 좌석 수)', async () => {
+      await createRoom({ maxPersonnel: 30 });
+      const res = await api()
+        .post('/api/study-rooms')
+        .send({ ...room, maxPersonnel: 31 })
+        .expect(400);
+      expect(res.body.error.details.join()).toContain('maxPersonnel');
     });
 
     it('UTC(Z)로 보내도 응답은 KST(+09:00)로 준다', async () => {
@@ -133,19 +163,63 @@ describe('StudyRooms (e2e)', () => {
       expect(res.body.data).toMatchObject({ ...room, maxPersonnel: 5 });
     });
 
-    it('최대 인원을 현재 신청 인원보다 작게 줄이면 CAPACITY_BELOW_CURRENT', async () => {
-      const roomId = await createRoom();
-      await applyVisit(roomId, '2030-01-10T10:00:00+09:00', '2030-01-10T12:00:00+09:00');
-      await applyVisit(roomId, '2030-01-10T10:00:00+09:00', '2030-01-10T12:00:00+09:00');
+    it('최대 인원을 줄일 때 없어질 좌석에 끝나지 않은 예약이 있으면 SEATS_IN_USE', async () => {
+      const roomId = await createRoom(); // 3석
+      await applyVisit(roomId, '2030-01-10T10:00:00+09:00', '2030-01-10T12:00:00+09:00', 'A', 1);
+      await applyVisit(roomId, '2030-01-10T10:00:00+09:00', '2030-01-10T12:00:00+09:00', 'B', 3);
+
+      const res = await api()
+        .patch(`/api/study-rooms/${roomId}`)
+        .send({ maxPersonnel: 2 })
+        .expect(409);
+      expect(res.body.error.code).toBe('SEATS_IN_USE');
+      expect(res.body.error.message).toContain('3번');
+    });
+
+    it('남는 좌석에만 예약이 있으면 신청 건수보다 작게도 줄일 수 있다 (좌석 = 최대 인원)', async () => {
+      const roomId = await createRoom(); // 3석
+      // 1번 좌석을 시간별로 나눠 3명이 쓴다
+      await applyVisit(roomId, '2030-01-10T10:00:00+09:00', '2030-01-10T12:00:00+09:00', 'A', 1);
+      await applyVisit(roomId, '2030-01-10T13:00:00+09:00', '2030-01-10T15:00:00+09:00', 'B', 1);
+      await applyVisit(roomId, '2030-01-10T19:00:00+09:00', '2030-01-10T21:00:00+09:00', 'C', 1);
 
       const res = await api()
         .patch(`/api/study-rooms/${roomId}`)
         .send({ maxPersonnel: 1 })
-        .expect(409);
-      expect(res.body.error.code).toBe('CAPACITY_BELOW_CURRENT');
+        .expect(200);
+      expect(res.body.data).toMatchObject({ maxPersonnel: 1, currentPersonnel: 3 });
+    });
 
-      // 현재 신청 인원과 같게는 줄일 수 있다
-      await api().patch(`/api/study-rooms/${roomId}`).send({ maxPersonnel: 2 }).expect(200);
+    it('취소했거나 이미 끝난 예약은 좌석 축소를 막지 않는다', async () => {
+      const roomId = await createRoom({ startDate: '2020-01-10T09:00:00+09:00' });
+      await applyVisit(roomId, '2020-01-10T10:00:00+09:00', '2020-01-10T12:00:00+09:00', 'A', 3);
+      const canceled = await applyVisit(
+        roomId,
+        '2030-01-10T10:00:00+09:00',
+        '2030-01-10T12:00:00+09:00',
+        'B',
+        2,
+      );
+      await prisma.visit.update({ where: { id: canceled.id }, data: { status: 'CANCELED' } });
+
+      await api().patch(`/api/study-rooms/${roomId}`).send({ maxPersonnel: 1 }).expect(200);
+    });
+
+    it('줄였다가 다시 늘리면 같은 좌석을 다시 쓴다 (좌석 행은 지우지 않는다)', async () => {
+      const roomId = await createRoom(); // 3석
+      const seat3 = await prisma.seat.findUniqueOrThrow({
+        where: { studyRoomId_number: { studyRoomId: roomId, number: 3 } },
+      });
+
+      await api().patch(`/api/study-rooms/${roomId}`).send({ maxPersonnel: 1 }).expect(200);
+      await api().patch(`/api/study-rooms/${roomId}`).send({ maxPersonnel: 4 }).expect(200);
+
+      const seats = await prisma.seat.findMany({
+        where: { studyRoomId: roomId },
+        orderBy: { number: 'asc' },
+      });
+      expect(seats.map((s) => s.number)).toEqual([1, 2, 3, 4]);
+      expect(seats[2]!.id).toBe(seat3.id);
     });
 
     it('운영 기간 밖으로 밀려나는 신청이 있으면 PERIOD_EXCLUDES_VISITS', async () => {
