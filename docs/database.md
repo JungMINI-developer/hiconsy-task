@@ -16,14 +16,11 @@ erDiagram
   VISIT ||--|{ VISIT_HISTORY : "변경 이력"
   STUDENT ||--o{ VISIT_HISTORY : "학생별 이력"
   STUDY_ROOM ||--o{ VISIT_HISTORY : "자습실별 이력"
-  STUDENT ||--o{ WAITLIST_ENTRY : "대기"
-  STUDY_ROOM ||--o{ WAITLIST_ENTRY : "대기 대상"
 ```
 
 - 학생 1명은 여러 자습실에 신청할 수 있고, 자습실 1개에는 여러 학생이 신청한다 → `visits`가 N:M을 풀어주는 테이블이다.
 - 같은 학생-자습실 쌍의 신청은 1행뿐이다 (`UNIQUE(student_id, study_room_id)`). 취소 후 재신청은 이 행의 상태를 되돌린다.
 - 신청 1건에는 이력이 1건 이상 있다 (최초 `APPLY`). 이력은 자습실·학생 기준으로도 바로 조회할 수 있게 FK를 함께 가진다.
-- 대기(`waitlist_entries`, #36)는 정원이 찬 자습실에 원하는 시간으로 줄을 선 기록이다. 학생-자습실 쌍당 **진행 중**(`ended_at IS NULL`) 대기는 1건이고, 끝난 대기는 지우지 않는다.
 
 ### 상세 ERD
 
@@ -34,8 +31,6 @@ erDiagram
   visits ||--|{ visit_histories : "visit_id"
   students ||--o{ visit_histories : "student_id"
   study_rooms ||--o{ visit_histories : "study_room_id"
-  students ||--o{ waitlist_entries : "student_id"
-  study_rooms ||--o{ waitlist_entries : "study_room_id"
 
   students {
     int id PK "SERIAL"
@@ -83,21 +78,6 @@ erDiagram
     varchar(255) reason "처리 사유, NULL 가능"
     timestamptz created_at "NOT NULL, DEFAULT now()"
   }
-
-  waitlist_entries {
-    int id PK "SERIAL"
-    int student_id FK,UK "진행 중이면 UNIQUE(student_id, study_room_id)"
-    int study_room_id FK,UK
-    timestamptz start_at "NOT NULL, 원하는 방문 시작"
-    timestamptz end_at "NOT NULL, 원하는 방문 종료"
-    WaitlistStatus status "NOT NULL, DEFAULT WAITING"
-    timestamptz offered_at "자리 제안 시각"
-    timestamptz offer_expires_at "제안 마감 (10분, 방문 시작 전까지)"
-    timestamptz ended_at "NULL = 진행 중(WAITING·OFFERED)"
-    varchar(255) end_reason "종료 사유 (제안 만료, 자습실 삭제 등)"
-    timestamptz created_at "NOT NULL, 순번 기준"
-    timestamptz updated_at "NOT NULL"
-  }
 ```
 
 > 표기: `||--o{` 1:0..N, `||--|{` 1:1..N / `PK` 기본키, `FK` 외래키, `UK` 복합 유니크 구성 컬럼.
@@ -105,12 +85,11 @@ erDiagram
 
 ### Enum
 
-| Enum             | 값                                                                   | 사용 컬럼                    | 의미                                                                                                             |
-| ---------------- | -------------------------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `VisitStatus`    | `APPLIED`, `CANCELED`                                                | `visits.status`              | 유효 신청 / 취소. `APPLIED`만 정원에 포함                                                                        |
-| `VisitAction`    | `APPLY`, `UPDATE`, `CANCEL`                                          | `visit_histories.action`     | 신청(재신청 포함) / 방문 시간 수정 / 취소                                                                        |
-| `ActorType`      | `STUDENT`, `INSTRUCTOR`, `SYSTEM`                                    | `visit_histories.actor_type` | 이력을 남긴 주체. `SYSTEM`은 자습실 변경·삭제에 따른 자동 처리                                                   |
-| `WaitlistStatus` | `WAITING`, `OFFERED`, `CONFIRMED`, `DECLINED`, `EXPIRED`, `CANCELED` | `waitlist_entries.status`    | 대기 / 자리 제안 중 (진행 중) · 확정 / 거절 / 만료 / 취소 (종료). `OFFERED`는 만료 전까지 정원 1자리를 잡아 둔다 |
+| Enum          | 값                                | 사용 컬럼                    | 의미                                                           |
+| ------------- | --------------------------------- | ---------------------------- | -------------------------------------------------------------- |
+| `VisitStatus` | `APPLIED`, `CANCELED`             | `visits.status`              | 유효 신청 / 취소. `APPLIED`만 정원에 포함                      |
+| `VisitAction` | `APPLY`, `UPDATE`, `CANCEL`       | `visit_histories.action`     | 신청(재신청 포함) / 방문 시간 수정 / 취소                      |
+| `ActorType`   | `STUDENT`, `INSTRUCTOR`, `SYSTEM` | `visit_histories.actor_type` | 이력을 남긴 주체. `SYSTEM`은 자습실 변경·삭제에 따른 자동 처리 |
 
 ### 상태 흐름
 
@@ -127,13 +106,12 @@ stateDiagram-v2
 
 ## 테이블 설명
 
-| 테이블             | 역할                                         | 비고                                                                          |
-| ------------------ | -------------------------------------------- | ----------------------------------------------------------------------------- |
-| `students`         | 학생 (필수 엔티티)                           | Soft Delete                                                                   |
-| `study_rooms`      | 자습실 (필수 엔티티). 정원·운영 기간         | Soft Delete. 화면 표시용 `name` 추가                                          |
-| `visits`           | 방문 신청의 **현재 상태**                    | 학생-자습실 쌍당 1행. 정원 계산·내 신청 목록의 기준                           |
-| `visit_histories`  | 신청·수정·취소 **이벤트 로그** (append-only) | 변경 전/후 방문 구간, 행위 주체, 사유. 자습실 상세의 이력 타임라인(FN-ROM-03) |
-| `waitlist_entries` | 대기열 (#36)                                 | 원하는 방문 구간, 상태, 제안 마감. 순번은 `created_at, id` 순으로 계산        |
+| 테이블            | 역할                                         | 비고                                                                          |
+| ----------------- | -------------------------------------------- | ----------------------------------------------------------------------------- |
+| `students`        | 학생 (필수 엔티티)                           | Soft Delete                                                                   |
+| `study_rooms`     | 자습실 (필수 엔티티). 정원·운영 기간         | Soft Delete. 화면 표시용 `name` 추가                                          |
+| `visits`          | 방문 신청의 **현재 상태**                    | 학생-자습실 쌍당 1행. 정원 계산·내 신청 목록의 기준                           |
+| `visit_histories` | 신청·수정·취소 **이벤트 로그** (append-only) | 변경 전/후 방문 구간, 행위 주체, 사유. 자습실 상세의 이력 타임라인(FN-ROM-03) |
 
 ## 설계 이유
 
@@ -175,10 +153,6 @@ stateDiagram-v2
 
 PostgreSQL 배제 제약(`EXCLUDE USING gist (student_id WITH =, tstzrange(start_at, end_at) WITH &&) WHERE (status = 'APPLIED')`)이면 DB가 직접 보장하지만, `btree_gist` 확장이 필요하고 Prisma 스키마로 표현할 수 없어 마이그레이션 SQL을 손으로 관리해야 한다(스키마와 DB가 어긋났다고 판단할 위험). 정원과 같은 방식(트랜잭션 + 행 락)으로 맞추는 쪽을 택했다.
 
-#### 대기열과 정원 (#36)
-
-정원은 **유효 신청 + 만료 전 자리 제안**으로 센다. 제안받은 학생의 자리를 다른 학생이 가로채지 못하게 하기 위해서다. 대기 행을 바꾸는 작업(제안·만료·되돌림)은 모두 자습실 락 안의 `syncWaitlist`가 맡아, 정원 검사와 같은 줄에 선다. 진행 중 대기 1건은 부분 유니크 인덱스(`WHERE ended_at IS NULL`)로 보장한다. `WHERE status IN (...)`은 PostgreSQL이 `= ANY (ARRAY[...])`로 바꿔 저장해 Prisma가 스키마와 DB가 다르다고 판단하므로 쓰지 않았다. → [solutions/waitlist-offer.md](./solutions/waitlist-offer.md)
-
 ### 5. 이력 테이블의 비정규화와 확장 필드
 
 - `study_room_id`, `student_id`를 이력에도 둔다. `visits`를 거치지 않고 "자습실별 이력(FN-ROM-03)"과 "학생별 이력"을 시간순 인덱스(`(study_room_id, created_at)`, `(student_id, created_at)`)로 바로 조회하기 위해서다. 이력은 불변 데이터라 비정규화로 인한 갱신 이상이 없다.
@@ -194,18 +168,16 @@ PostgreSQL 배제 제약(`EXCLUDE USING gist (student_id WITH =, tstzrange(start
 
 ### 7. 제약조건 정리
 
-| 대상                          | 제약                                       | 위치                                        |
-| ----------------------------- | ------------------------------------------ | ------------------------------------------- |
-| `study_rooms`                 | `max_personnel > 0`                        | DB CHECK                                    |
-| `study_rooms`                 | `start_date < end_date`                    | DB CHECK + DTO 검증                         |
-| `visits`                      | `start_at < end_at`                        | DB CHECK + DTO 검증                         |
-| `visits`                      | 학생-자습실 1행                            | DB UNIQUE                                   |
-| `students`                    | 활성 학생끼리 전화번호 중복 불가           | DB 부분 UNIQUE (`WHERE deleted_at IS NULL`) |
-| `visits`                      | 방문 구간 ⊂ 자습실 운영 기간               | 서비스 로직                                 |
-| `visits`                      | 유효 신청 수 ≤ `max_personnel`             | 서비스 로직 (트랜잭션 + 락)                 |
-| `visits`                      | 삭제된 자습실·학생에는 신청 불가           | 서비스 로직                                 |
-| `waitlist_entries`            | 학생-자습실 쌍당 진행 중 1건               | DB 부분 UNIQUE (`WHERE ended_at IS NULL`)   |
-| `visits` + `waitlist_entries` | 유효 신청 + 만료 전 제안 ≤ `max_personnel` | 서비스 로직 (자습실 락 안의 동기화)         |
+| 대상          | 제약                             | 위치                                        |
+| ------------- | -------------------------------- | ------------------------------------------- |
+| `study_rooms` | `max_personnel > 0`              | DB CHECK                                    |
+| `study_rooms` | `start_date < end_date`          | DB CHECK + DTO 검증                         |
+| `visits`      | `start_at < end_at`              | DB CHECK + DTO 검증                         |
+| `visits`      | 학생-자습실 1행                  | DB UNIQUE                                   |
+| `students`    | 활성 학생끼리 전화번호 중복 불가 | DB 부분 UNIQUE (`WHERE deleted_at IS NULL`) |
+| `visits`      | 방문 구간 ⊂ 자습실 운영 기간     | 서비스 로직                                 |
+| `visits`      | 유효 신청 수 ≤ `max_personnel`   | 서비스 로직 (트랜잭션 + 락)                 |
+| `visits`      | 삭제된 자습실·학생에는 신청 불가 | 서비스 로직                                 |
 
 전화번호 부분 유니크 인덱스는 Prisma의 `partialIndexes` 프리뷰 기능(`@@unique(..., where: { deletedAt: null })`)으로 스키마에 표현했다. Soft Delete와 유니크 제약을 함께 쓰면 삭제된 행이 번호를 계속 점유하는 문제가 생기는데, 부분 인덱스로 이를 DB 레벨에서 해결한다.
 
@@ -213,19 +185,16 @@ CHECK 제약은 Prisma 스키마 문법으로 표현할 수 없어 마이그레�
 
 ### 8. 인덱스
 
-| 인덱스                                                                       | 용도                                                     |
-| ---------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `visits (student_id, study_room_id)` UNIQUE                                  | 중복 신청 방지, 내 신청 목록                             |
-| `visits (study_room_id, status)`                                             | 자습실별 현재 신청 인원 집계 (정원 검사, 목록)           |
-| `visit_histories (study_room_id, created_at)`                                | 자습실 상세 이력 시간순 조회                             |
-| `visit_histories (student_id, created_at)`                                   | 학생별 이력 조회                                         |
-| `visit_histories (visit_id)`                                                 | 신청 단건 이력                                           |
-| `study_rooms (deleted_at, start_date)`                                       | 삭제 제외 목록 + 운영 시작일 정렬                        |
-| `students (deleted_at)`                                                      | 삭제 제외 학생 목록                                      |
-| `students (phone) WHERE deleted_at IS NULL` UNIQUE                           | 활성 학생 전화번호 중복 방지 (삭제된 번호는 재사용 가능) |
-| `waitlist_entries (student_id, study_room_id) WHERE ended_at IS NULL` UNIQUE | 진행 중 대기 중복 방지                                   |
-| `waitlist_entries (study_room_id, status, created_at)`                       | 자습실별 대기 순번·제안 수                               |
-| `waitlist_entries (student_id, status)`                                      | 내 대기 목록                                             |
+| 인덱스                                             | 용도                                                     |
+| -------------------------------------------------- | -------------------------------------------------------- |
+| `visits (student_id, study_room_id)` UNIQUE        | 중복 신청 방지, 내 신청 목록                             |
+| `visits (study_room_id, status)`                   | 자습실별 현재 신청 인원 집계 (정원 검사, 목록)           |
+| `visit_histories (study_room_id, created_at)`      | 자습실 상세 이력 시간순 조회                             |
+| `visit_histories (student_id, created_at)`         | 학생별 이력 조회                                         |
+| `visit_histories (visit_id)`                       | 신청 단건 이력                                           |
+| `study_rooms (deleted_at, start_date)`             | 삭제 제외 목록 + 운영 시작일 정렬                        |
+| `students (deleted_at)`                            | 삭제 제외 학생 목록                                      |
+| `students (phone) WHERE deleted_at IS NULL` UNIQUE | 활성 학생 전화번호 중복 방지 (삭제된 번호는 재사용 가능) |
 
 ## 향후 확장 고려
 
@@ -236,6 +205,7 @@ CHECK 제약은 Prisma 스키마 문법으로 표현할 수 없어 마이그레�
 ## 마이그레이션 / 시드
 
 - 마이그레이션: `apps/api/prisma/migrations/` (`pnpm db:migrate`)
+  - `20261116100000_waitlist`에서 만든 대기열 테이블(`waitlist_entries`, `WaitlistStatus`)은 `20261116130000_drop_waitlist`에서 지웠다 (#44, 좌석 단위 예약 전환). 이미 적용된 마이그레이션은 고치지 않고 삭제 마이그레이션을 더했다.
 - 시드: `apps/api/prisma/seed.ts` (`pnpm db:seed`)
   - 학생 5명, 자습실 3개(실행일 기준 내일~), 신청 3건과 이력 5건 (신청→수정, 신청→취소, 신청)
   - 학생 데이터가 이미 있으면 건너뛰어 멱등하게 동작한다 (Docker 실행 시 매번 실행됨)
