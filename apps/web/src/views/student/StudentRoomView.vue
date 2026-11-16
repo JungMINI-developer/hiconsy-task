@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { ErrorCode, type Visit } from '@hiconsy/shared';
 import { ChevronLeft } from 'lucide-vue-next';
@@ -221,6 +221,26 @@ function findOtherRooms() {
   if (r && range) void full.onFull({ room: r, ...range });
 }
 
+// ── 하단 고정 바 ────────────────────────────────────────
+/**
+ * 토스트가 하단 바(특히 모바일의 넓은 버튼)를 가리지 않도록, 바 높이만큼 토스트 영역을 올린다
+ * (AppToaster가 --toast-offset을 쓴다).
+ */
+const actionBar = ref<HTMLElement | null>(null);
+const barObserver = new ResizeObserver(([entry]) => {
+  const height = entry?.borderBoxSize[0]?.blockSize ?? 0;
+  document.documentElement.style.setProperty('--toast-offset', `${height}px`);
+});
+watch(actionBar, (el, prev) => {
+  if (prev) barObserver.unobserve(prev);
+  if (el) barObserver.observe(el);
+  else document.documentElement.style.removeProperty('--toast-offset');
+});
+onBeforeUnmount(() => {
+  barObserver.disconnect();
+  document.documentElement.style.removeProperty('--toast-offset');
+});
+
 // ── 시간 변경 (?edit=visitId) ───────────────────────────
 const editDialog = useDialogQuery('edit');
 const editingVisit = computed(() =>
@@ -364,6 +384,8 @@ function onTimeChanged(visit: Visit) {
     <!-- 하단 고정: 고른 좌석·시간 + [신청하기] / 내 방문 + [시간 변경] -->
     <div
       v-if="room && !notFound"
+      ref="actionBar"
+      data-testid="room-action-bar"
       class="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur"
     >
       <div
