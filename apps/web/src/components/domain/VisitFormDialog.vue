@@ -248,6 +248,15 @@ const seatsLoaded = ref(false);
 let pickDefaultSeat = false;
 /** 늦게 온 응답 버리기 */
 let seatRequest = 0;
+/**
+ * 좌석 안내를 토스트로 띄우고, 다이얼로그 안 라이브 영역으로도 읽어 준다.
+ * 모달이 열려 있으면 바깥의 토스트 영역은 접근성 트리에서 가려져 스크린리더가 읽지 못한다.
+ */
+const seatNotice = ref('');
+function notifySeat(message: string) {
+  toast.error(message);
+  seatNotice.value = message;
+}
 
 const freeSeatCount = computed(() => seats.value.filter((s) => s.available).length);
 const selectedSeat = computed(() => seats.value.find((s) => s.id === seatId.value) ?? null);
@@ -296,7 +305,7 @@ async function loadSeats(reason: 'time' | 'refresh' = 'time') {
     } else if (seatId.value !== null && !isFree(seatId.value)) {
       seatId.value = null;
       if (reason === 'time') {
-        toast.error('그 시간에는 다른 학생이 이미 예약한 좌석이에요. 다른 좌석을 골라 주세요');
+        notifySeat('그 시간에는 다른 학생이 이미 예약한 좌석이에요. 다른 좌석을 골라 주세요');
       }
     }
   } catch (e) {
@@ -317,6 +326,7 @@ watch(
   ([isOpen], previous) => {
     const [wasOpen, prevRoomId] = previous ?? [false, null];
     if (!isOpen) {
+      seatNotice.value = '';
       seats.value = [];
       seatId.value = null;
       seatsLoaded.value = false;
@@ -393,7 +403,7 @@ function handleError(e: unknown) {
     case ErrorCode.SEAT_NOT_FOUND:
     case ErrorCode.CAPACITY_FULL: {
       const number = selectedSeat.value?.number;
-      toast.error(
+      notifySeat(
         code === ErrorCode.SEAT_TAKEN && number !== undefined
           ? `방금 다른 학생이 ${number}번 좌석을 예약했어요. 다른 좌석을 골라 주세요`
           : errorMessage(e),
@@ -526,6 +536,7 @@ function handleError(e: unknown) {
           aria-labelledby="visit-seat-heading"
           class="flex flex-col gap-3 border-t border-line pt-5"
         >
+          <p class="sr-only" aria-live="assertive">{{ seatNotice }}</p>
           <div class="flex items-baseline justify-between gap-3">
             <h3 id="visit-seat-heading" class="text-label">좌석</h3>
             <p
