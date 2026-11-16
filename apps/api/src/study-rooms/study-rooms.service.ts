@@ -8,12 +8,6 @@ import {
 import { DomainException } from '../common/exceptions/domain.exception.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CancelReason, cancelAppliedVisitsBySystem } from '../visits/visit-cancellation.js';
-import {
-  cancelActiveWaitlist,
-  countWaitlist,
-  syncWaitlist,
-  WaitlistReason,
-} from '../waitlist/waitlist-sync.js';
 import type { CreateStudyRoomDto } from './dto/create-study-room.dto.js';
 import type { UpdateStudyRoomDto } from './dto/update-study-room.dto.js';
 import { lockStudyRoom, studyRoomNotFound } from './study-room-lock.js';
@@ -35,11 +29,7 @@ export class StudyRoomsService {
       include: withAppliedCount,
       orderBy: [{ startDate: 'asc' }, { id: 'asc' }],
     });
-    const waitlist = await countWaitlist(
-      this.prisma,
-      rooms.map((room) => room.id),
-    );
-    return rooms.map((room) => toStudyRoom(room, room._count.visits, waitlist.get(room.id)));
+    return rooms.map((room) => toStudyRoom(room, room._count.visits));
   }
 
   async findOne(id: number): Promise<StudyRoom> {
@@ -48,8 +38,7 @@ export class StudyRoomsService {
       include: withAppliedCount,
     });
     if (!room) throw studyRoomNotFound();
-    const waitlist = await countWaitlist(this.prisma, [room.id]);
-    return toStudyRoom(room, room._count.visits, waitlist.get(room.id));
+    return toStudyRoom(room, room._count.visits);
   }
 
   /** FR-ROM-02 */
@@ -68,8 +57,6 @@ export class StudyRoomsService {
    * FR-ROM-04, FR-ROM-06
    * - 최대 인원은 현재 유효 신청 인원보다 작게 줄일 수 없다.
    * - 운영 기간은 기존 유효 신청의 방문 구간을 모두 포함해야 한다.
-   * - 대기(#36)는 막지 않는다: 새 기간 밖이 된 대기는 자동 취소하고,
-   *   정원 변화는 동기화로 반영한다 (늘면 다음 순번에 제안, 줄어 넘치는 제안은 대기로 되돌림).
    */
   async update(id: number, dto: UpdateStudyRoomDto): Promise<StudyRoom> {
     return this.prisma.$transaction(async (tx) => {
@@ -115,16 +102,7 @@ export class StudyRoomsService {
         where: { id },
         data: { name: dto.name, maxPersonnel, startDate, endDate },
       });
-      if (periodChanged) {
-        await cancelActiveWaitlist(
-          tx,
-          { studyRoomId: id, OR: [{ startAt: { lt: startDate } }, { endAt: { gt: endDate } }] },
-          WaitlistReason.PERIOD_CHANGED,
-        );
-      }
-      await syncWaitlist(tx, room);
-      const waitlist = await countWaitlist(tx, [id]);
-      return toStudyRoom(room, appliedCount, waitlist.get(id));
+      return toStudyRoom(room, appliedCount);
     });
   }
 
@@ -143,7 +121,6 @@ export class StudyRoomsService {
         CancelReason.STUDY_ROOM_DELETED,
         now,
       );
-      await cancelActiveWaitlist(tx, { studyRoomId: id }, WaitlistReason.STUDY_ROOM_DELETED, now);
 
       await tx.studyRoom.update({ where: { id }, data: { deletedAt: now } });
     });

@@ -6,8 +6,6 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { CancelReason, cancelAppliedVisitsBySystem } from '../visits/visit-cancellation.js';
 import type { CreateStudentDto } from './dto/create-student.dto.js';
 import type { UpdateStudentDto } from './dto/update-student.dto.js';
-import { lockStudyRoom } from '../study-rooms/study-room-lock.js';
-import { cancelActiveWaitlist, syncWaitlist, WaitlistReason } from '../waitlist/waitlist-sync.js';
 import { lockStudent, studentNotFound } from './student-lock.js';
 import { toStudent } from './student.mapper.js';
 
@@ -50,38 +48,17 @@ export class StudentsService {
   /**
    * FR-STD-02: Soft Delete.
    * 유효 신청은 자동 취소하고 이력에 SYSTEM 주체와 "학생 삭제" 사유를 남긴다.
-   * 진행 중 대기도 자동 취소하고, 비워진 자리는 각 자습실의 다음 대기자에게 제안한다 (#36).
    *
-   * 락: 학생 행(FOR NO KEY UPDATE) → 관련 자습실 행(id 순, FOR UPDATE).
-   * 학생 행을 FOR UPDATE로 잡으면, 자습실 삭제가 이 학생의 이력을 넣을 때 FK 검사(FOR KEY SHARE)와 충돌해
+   * 락: 학생 행(FOR NO KEY UPDATE). FOR UPDATE로 잡으면 자습실 삭제가 이 학생의 이력을 넣을 때
+   * FK 검사(FOR KEY SHARE)와 충돌한다. 이 삭제도 취소 이력을 넣으며 자습실 FK 검사를 하므로
    * "학생 삭제는 자습실 락을, 자습실 삭제는 학생 락을" 기다리는 교착 상태가 된다.
    */
   async remove(id: number): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await lockStudent(tx, id, 'noKeyUpdate');
 
-      const [visits, waits] = await Promise.all([
-        tx.visit.findMany({
-          where: { studentId: id, status: 'APPLIED' },
-          select: { studyRoomId: true },
-        }),
-        tx.waitlistEntry.findMany({
-          where: { studentId: id, endedAt: null },
-          select: { studyRoomId: true },
-        }),
-      ]);
-      const roomIds = [...new Set([...visits, ...waits].map((r) => r.studyRoomId))].sort(
-        (a, b) => a - b,
-      );
-      for (const roomId of roomIds) await lockStudyRoom(tx, roomId).catch(() => undefined);
-
       const now = new Date();
       await cancelAppliedVisitsBySystem(tx, { studentId: id }, CancelReason.STUDENT_DELETED, now);
-      await cancelActiveWaitlist(tx, { studentId: id }, WaitlistReason.STUDENT_DELETED, now);
-      for (const roomId of roomIds) {
-        const room = await tx.studyRoom.findUnique({ where: { id: roomId } });
-        if (room && !room.deletedAt) await syncWaitlist(tx, room, now);
-      }
       await tx.student.update({ where: { id }, data: { deletedAt: now } });
     });
   }
