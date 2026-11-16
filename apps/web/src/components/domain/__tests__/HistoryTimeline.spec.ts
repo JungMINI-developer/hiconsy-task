@@ -12,6 +12,8 @@ const base: StudyRoomHistory = {
   prevEndAt: null,
   startAt: '2026-11-20T18:00:00+09:00',
   endAt: '2026-11-20T20:00:00+09:00',
+  prevSeat: null,
+  seat: null,
   actorType: 'STUDENT',
   reason: null,
   createdAt: '2026-11-14T09:00:00+09:00',

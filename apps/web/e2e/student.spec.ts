@@ -89,7 +89,8 @@ test.describe('학생 · 방문 신청', () => {
     await page.goto(`/student/rooms?apply=${room.id}`);
     const dialog = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
     await expect(dialog).toBeVisible();
-    await seed.visit(other.id, room.id, kst(1, 15), kst(1, 16)); // 다른 학생이 먼저
+    // 다른 학생이 같은 시간(기본 선택 10:00–12:00)의 마지막 좌석을 먼저 가져감
+    await seed.visit(other.id, room.id, kst(1, 10), kst(1, 12));
     await dialog.getByRole('button', { name: '신청하기' }).click();
 
     await expect(toast(page, '방금 정원이 다 찼어요. 다른 자습실을 골라 주세요')).toBeVisible();
@@ -106,14 +107,15 @@ test.describe('학생 · 방문 신청', () => {
     await seed.room({ name: 'D 자습실', startDate: kst(1, 15) }); // 오전 시간은 운영 전
     const me = await seed.student('김하늘', '010-1111-1111');
     const other = await seed.student('이도윤', '010-2222-2222');
-    await seed.visit(other.id, roomC.id, kst(1, 18), kst(1, 19)); // C는 이미 마감
+    const third = await seed.student('박서준', '010-3333-3333');
+    await seed.visit(third.id, roomC.id, kst(1, 10), kst(1, 12)); // C는 그 시간에 이미 마감
     await enterAsStudent(page, me);
 
-    // 기본 선택(10:00–12:00)으로 A 신청 → 그 사이 다른 학생이 A의 마지막 자리를 가져감
+    // 기본 선택(10:00–12:00)으로 A 신청 → 그 사이 다른 학생이 같은 시간의 마지막 좌석을 가져감
     await page.goto(`/student/rooms?apply=${roomA.id}`);
     const applyA = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
     await expect(applyA.getByRole('combobox', { name: '방문 시작 시각' })).toHaveText('10:00');
-    await seed.visit(other.id, roomA.id, kst(1, 15), kst(1, 16));
+    await seed.visit(other.id, roomA.id, kst(1, 10), kst(1, 12));
     await applyA.getByRole('button', { name: '신청하기' }).click();
 
     // 같은 시간에 자리가 있는 곳만 안내 (C는 마감, D는 운영 기간 밖)
@@ -153,7 +155,8 @@ test.describe('학생 · 방문 신청', () => {
     await page.goto(`/student/visits?apply=${roomA.id}`);
     const reapply = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
     await expect(reapply).toBeVisible();
-    await seed.visit(other.id, roomA.id, kst(1, 15), kst(1, 16));
+    // 다시 신청하려는 시간과 겹치게 다른 학생이 마지막 좌석을 가져감
+    await seed.visit(other.id, roomA.id, kst(1, 10), kst(1, 12));
     await reapply.getByRole('button', { name: '신청하기' }).click();
 
     const alternatives = page.getByRole('dialog', { name: 'A 자습실 정원이 방금 찼어요' });

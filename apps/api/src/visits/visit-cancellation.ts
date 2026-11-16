@@ -33,6 +33,8 @@ export async function cancelAppliedVisitsBySystem(
       prevEndAt: visit.endAt,
       startAt: visit.startAt,
       endAt: visit.endAt,
+      prevSeatId: visit.seatId,
+      seatId: visit.seatId,
       actorType: 'SYSTEM' as const,
       reason,
     })),

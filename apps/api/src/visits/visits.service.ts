@@ -1,13 +1,14 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ErrorCode, type Visit } from '@hiconsy/shared';
 import { DomainException } from '../common/exceptions/domain.exception.js';
-import type { Prisma, StudyRoom, Visit as VisitRow } from '../generated/prisma/client.js';
+import type { Prisma, Seat, StudyRoom, Visit as VisitRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { lockStudent, studentNotFound, type StudentLockMode } from '../students/student-lock.js';
+import { pickSeat } from '../seats/seat-occupancy.js';
 import { lockStudyRoom } from '../study-rooms/study-room-lock.js';
 import type { CreateVisitDto } from './dto/create-visit.dto.js';
 import type { UpdateVisitDto } from './dto/update-visit.dto.js';
-import { toVisit } from './visit.mapper.js';
+import { toVisit, visitInclude } from './visit.mapper.js';
 import { assertValidVisitTime } from './visit-time.js';
 
 /**
@@ -16,7 +17,8 @@ import { assertValidVisitTime } from './visit-time.js';
  * 모든 변경은 하나의 트랜잭션에서 다음 순서로 처리한다.
  * 1. 학생 행 락: 학생 삭제와 직렬화. 신청·시간 수정은 FOR NO KEY UPDATE로 같은 학생의
  *    신청끼리도 직렬화한다 (다른 자습실과의 시간 겹침 보장, student-lock.ts 참고)
- * 2. 자습실 행 FOR UPDATE: 같은 자습실의 신청·수정·취소, 자습실 수정·삭제와 직렬화 (정원 보장)
+ * 2. 자습실 행 FOR UPDATE: 같은 자습실의 신청·수정·취소, 자습실 수정·삭제와 직렬화
+ *    (같은 좌석의 시간 겹침 검사 → 저장 사이에 끼어들 수 없다, #45)
  * 3. 규칙 검사 → visits 변경 → visit_histories 기록
  */
 @Injectable()
@@ -29,13 +31,17 @@ export class VisitsService {
     if (exists === 0) throw studentNotFound();
     const visits = await this.prisma.visit.findMany({
       where: { studentId },
-      include: { studyRoom: true },
+      include: visitInclude,
       orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
     });
     return visits.map(toVisit);
   }
 
-  /** FR-VST-01: 신청 또는 취소한 신청의 재신청 */
+  /**
+   * FR-VST-01: 신청 또는 취소한 신청의 재신청.
+   * 좌석(#45): `seatId`가 있으면 그 좌석이 구간 내내 비어 있어야 하고(409 SEAT_TAKEN),
+   * 없으면 비어 있는 가장 작은 번호 좌석을 고른다(없으면 409 CAPACITY_FULL).
+   */
   async apply(studentId: number, dto: CreateVisitDto): Promise<Visit> {
     const startAt = new Date(dto.startAt);
     const endAt = new Date(dto.endAt);
@@ -60,27 +66,18 @@ export class VisitsService {
 
       await assertNoOverlap(tx, studentId, startAt, endAt);
 
-      const appliedCount = await tx.visit.count({
-        where: { studyRoomId: room.id, status: 'APPLIED' },
-      });
-      if (appliedCount >= room.maxPersonnel) {
-        throw new DomainException(
-          ErrorCode.CAPACITY_FULL,
-          `정원(${room.maxPersonnel}명)이 가득 찼습니다.`,
-          HttpStatus.CONFLICT,
-        );
-      }
+      const seat = await pickSeat(tx, room, { startAt, endAt }, dto.seatId);
 
       // 재신청은 기존 행을 APPLIED로 되돌린다 (UNIQUE(student_id, study_room_id) 유지)
       const visit = existing
         ? await tx.visit.update({
             where: { id: existing.id },
-            data: { status: 'APPLIED', startAt, endAt, canceledAt: null },
-            include: { studyRoom: true },
+            data: { status: 'APPLIED', startAt, endAt, seatId: seat.id, canceledAt: null },
+            include: visitInclude,
           })
         : await tx.visit.create({
-            data: { studentId, studyRoomId: room.id, startAt, endAt },
-            include: { studyRoom: true },
+            data: { studentId, studyRoomId: room.id, startAt, endAt, seatId: seat.id },
+            include: visitInclude,
           });
 
       await tx.visitHistory.create({
@@ -91,6 +88,7 @@ export class VisitsService {
           action: 'APPLY',
           startAt,
           endAt,
+          seatId: seat.id,
           actorType: 'STUDENT',
         },
       });
@@ -98,7 +96,10 @@ export class VisitsService {
     });
   }
 
-  /** FR-VST-02: 방문 시간 수정 */
+  /**
+   * FR-VST-02: 방문 시간 수정. 좌석도 함께 바꿀 수 있다 (#45).
+   * `seatId`가 없으면 지금 좌석을 유지하고, 새 시간에 그 좌석이 비어 있어야 한다(자기 신청은 제외).
+   */
   async updateTime(studentId: number, visitId: number, dto: UpdateVisitDto): Promise<Visit> {
     const startAt = new Date(dto.startAt);
     const endAt = new Date(dto.endAt);
@@ -108,16 +109,20 @@ export class VisitsService {
       assertChangeable(visit);
       assertValidVisitTime(startAt, endAt, room);
 
+      const seatId = dto.seatId ?? visit.seatId ?? undefined;
       const unchanged =
-        visit.startAt.getTime() === startAt.getTime() && visit.endAt.getTime() === endAt.getTime();
+        visit.startAt.getTime() === startAt.getTime() &&
+        visit.endAt.getTime() === endAt.getTime() &&
+        seatId === visit.seatId;
       if (unchanged) return toVisit({ ...visit, studyRoom: room });
 
       await assertNoOverlap(tx, studentId, startAt, endAt, visit.id);
+      const seat = await pickSeat(tx, room, { startAt, endAt }, seatId, visit.id);
 
       const updated = await tx.visit.update({
         where: { id: visit.id },
-        data: { startAt, endAt },
-        include: { studyRoom: true },
+        data: { startAt, endAt, seatId: seat.id },
+        include: visitInclude,
       });
       await tx.visitHistory.create({
         data: {
@@ -129,6 +134,8 @@ export class VisitsService {
           prevEndAt: visit.endAt,
           startAt,
           endAt,
+          prevSeatId: visit.seatId,
+          seatId: seat.id,
           actorType: 'STUDENT',
         },
       });
@@ -136,7 +143,7 @@ export class VisitsService {
     });
   }
 
-  /** FR-VST-03: 취소 (정원 복원) */
+  /** FR-VST-03: 취소. 좌석 기록은 남기고(재신청 때 기본 선택), 그 시간의 좌석은 비워진다 */
   async cancel(studentId: number, visitId: number): Promise<Visit> {
     return this.prisma.$transaction(async (tx) => {
       // 취소는 시간 겹침을 만들 수 없으므로 학생 삭제와만 직렬화한다
@@ -146,7 +153,7 @@ export class VisitsService {
       const canceled = await tx.visit.update({
         where: { id: visit.id },
         data: { status: 'CANCELED', canceledAt: new Date() },
-        include: { studyRoom: true },
+        include: visitInclude,
       });
       await tx.visitHistory.create({
         data: {
@@ -158,6 +165,8 @@ export class VisitsService {
           prevEndAt: visit.endAt,
           startAt: visit.startAt,
           endAt: visit.endAt,
+          prevSeatId: visit.seatId,
+          seatId: visit.seatId,
           actorType: 'STUDENT',
         },
       });
@@ -174,13 +183,16 @@ export class VisitsService {
     studentId: number,
     visitId: number,
     studentLock: StudentLockMode,
-  ): Promise<{ visit: VisitRow; room: StudyRoom }> {
+  ): Promise<{ visit: VisitRow & { seat: Seat | null }; room: StudyRoom }> {
     await lockStudent(tx, studentId, studentLock);
     const target = await tx.visit.findFirst({ where: { id: visitId, studentId } });
     if (!target) throw visitNotFound();
 
     await lockStudyRoom(tx, target.studyRoomId);
-    const visit = await tx.visit.findUniqueOrThrow({ where: { id: visitId } });
+    const visit = await tx.visit.findUniqueOrThrow({
+      where: { id: visitId },
+      include: { seat: true },
+    });
     const room = await tx.studyRoom.findUniqueOrThrow({ where: { id: visit.studyRoomId } });
     return { visit, room };
   }

@@ -11,6 +11,7 @@ function visit(status: Visit['status'], startAt: string, endAt: string): Visit {
     studyRoom: { id: 1, name: 'A', startDate: startAt, endDate: endAt, deleted: false },
     startAt,
     endAt,
+    seat: null,
     status,
     canceledAt: status === 'CANCELED' ? startAt : null,
     createdAt: startAt,

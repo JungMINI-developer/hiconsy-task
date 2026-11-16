@@ -32,13 +32,22 @@ export class VisitsController {
   }
 
   @Post()
-  @ApiOperation({ summary: '방문 신청 (취소한 자습실은 재신청)' })
+  @ApiOperation({
+    summary: '방문 신청 (취소한 자습실은 재신청). seatId가 없으면 빈 좌석 자동 배정',
+  })
   @ApiResponse({
     status: 400,
     description: 'INVALID_PERIOD / VISIT_IN_PAST / VISIT_OUT_OF_PERIOD / 입력값 검증 실패',
   })
-  @ApiResponse({ status: 404, description: 'STUDENT_NOT_FOUND / STUDY_ROOM_NOT_FOUND' })
-  @ApiResponse({ status: 409, description: 'ALREADY_APPLIED / VISIT_TIME_OVERLAP / CAPACITY_FULL' })
+  @ApiResponse({
+    status: 404,
+    description: 'STUDENT_NOT_FOUND / STUDY_ROOM_NOT_FOUND / SEAT_NOT_FOUND',
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      'ALREADY_APPLIED / VISIT_TIME_OVERLAP / SEAT_TAKEN: 고른 좌석이 그 시간에 예약됨 / CAPACITY_FULL: 그 시간 내내 빈 좌석 없음 (자동 배정)',
+  })
   apply(
     @Param('studentId', ParseIntPipe) studentId: number,
     @Body() dto: CreateVisitDto,
@@ -47,12 +56,13 @@ export class VisitsController {
   }
 
   @Patch(':visitId')
-  @ApiOperation({ summary: '방문 시간 수정' })
+  @ApiOperation({ summary: '방문 시간 수정 (좌석도 함께 바꿀 수 있음)' })
   @ApiResponse({ status: 400, description: 'INVALID_PERIOD / VISIT_IN_PAST / VISIT_OUT_OF_PERIOD' })
-  @ApiResponse({ status: 404, description: 'STUDENT_NOT_FOUND / VISIT_NOT_FOUND' })
+  @ApiResponse({ status: 404, description: 'STUDENT_NOT_FOUND / VISIT_NOT_FOUND / SEAT_NOT_FOUND' })
   @ApiResponse({
     status: 409,
-    description: 'VISIT_TIME_OVERLAP / VISIT_ALREADY_CANCELED / VISIT_ALREADY_STARTED',
+    description:
+      'VISIT_TIME_OVERLAP / SEAT_TAKEN / CAPACITY_FULL / VISIT_ALREADY_CANCELED / VISIT_ALREADY_STARTED',
   })
   updateTime(
     @Param('studentId', ParseIntPipe) studentId: number,

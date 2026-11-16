@@ -1,11 +1,13 @@
 import type { StudyRoom, StudyRoomHistory, StudyRoomVisit } from '@hiconsy/shared';
 import type {
+  Seat as SeatRow,
   StudyRoom as StudyRoomRow,
   Student as StudentRow,
   Visit as VisitRow,
   VisitHistory as VisitHistoryRow,
 } from '../generated/prisma/client.js';
 import { toKstIso, toKstIsoOrNull } from '../common/utils/date.js';
+import { toSeatRef } from '../seats/seat.mapper.js';
 
 export function toStudyRoom(row: StudyRoomRow, currentPersonnel: number): StudyRoom {
   return {
@@ -21,7 +23,11 @@ export function toStudyRoom(row: StudyRoomRow, currentPersonnel: number): StudyR
 }
 
 export function toStudyRoomHistory(
-  row: VisitHistoryRow & { student: Pick<StudentRow, 'id' | 'name'> },
+  row: VisitHistoryRow & {
+    student: Pick<StudentRow, 'id' | 'name'>;
+    prevSeat: SeatRow | null;
+    seat: SeatRow | null;
+  },
 ): StudyRoomHistory {
   return {
     id: row.id,
@@ -32,6 +38,8 @@ export function toStudyRoomHistory(
     prevEndAt: toKstIsoOrNull(row.prevEndAt),
     startAt: toKstIso(row.startAt),
     endAt: toKstIso(row.endAt),
+    prevSeat: toSeatRef(row.prevSeat),
+    seat: toSeatRef(row.seat),
     actorType: row.actorType,
     reason: row.reason,
     createdAt: toKstIso(row.createdAt),
@@ -41,6 +49,7 @@ export function toStudyRoomHistory(
 export function toStudyRoomVisit(
   row: VisitRow & {
     student: Pick<StudentRow, 'id' | 'name' | 'phone'>;
+    seat: SeatRow | null;
     histories: Pick<VisitHistoryRow, 'createdAt'>[];
   },
 ): StudyRoomVisit {
@@ -49,6 +58,7 @@ export function toStudyRoomVisit(
     student: { id: row.student.id, name: row.student.name, phone: row.student.phone },
     startAt: toKstIso(row.startAt),
     endAt: toKstIso(row.endAt),
+    seat: toSeatRef(row.seat),
     // 마지막 APPLY 이력이 없으면(이력 도입 전 데이터) 신청 행 생성 시각으로 대신한다
     appliedAt: toKstIso(row.histories[0]?.createdAt ?? row.createdAt),
   };

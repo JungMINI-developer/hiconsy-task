@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { CreateStudyRoomRequest } from '@hiconsy/shared';
+import { ROOM_CAPACITY_MAX, type CreateStudyRoomRequest } from '@hiconsy/shared';
 import { Transform } from 'class-transformer';
 import { IsISO8601, IsInt, IsNotEmpty, IsString, Max, MaxLength, Min } from 'class-validator';
 
@@ -11,10 +11,15 @@ export class CreateStudyRoomDto implements CreateStudyRoomRequest {
   @MaxLength(100)
   name: string;
 
-  @ApiProperty({ description: '최대 인원', example: 10, minimum: 1, maximum: 1000 })
+  @ApiProperty({
+    description: '최대 인원 = 좌석 수',
+    example: 10,
+    minimum: 1,
+    maximum: ROOM_CAPACITY_MAX,
+  })
   @IsInt()
   @Min(1)
-  @Max(1000)
+  @Max(ROOM_CAPACITY_MAX)
   maxPersonnel: number;
 
   @ApiProperty({ description: '운영 시작 일시 (ISO 8601)', example: '2026-11-20T09:00:00+09:00' })

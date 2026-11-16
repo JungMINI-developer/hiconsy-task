@@ -7,6 +7,7 @@ import {
 } from '@hiconsy/shared';
 import { DomainException } from '../common/exceptions/domain.exception.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ensureSeats } from '../seats/seat-occupancy.js';
 import { CancelReason, cancelAppliedVisitsBySystem } from '../visits/visit-cancellation.js';
 import type { CreateStudyRoomDto } from './dto/create-study-room.dto.js';
 import type { UpdateStudyRoomDto } from './dto/update-study-room.dto.js';
@@ -41,21 +42,26 @@ export class StudyRoomsService {
     return toStudyRoom(room, room._count.visits);
   }
 
-  /** FR-ROM-02 */
+  /** FR-ROM-02: 최대 인원만큼 좌석 1~N번을 함께 만든다 (#45) */
   async create(dto: CreateStudyRoomDto): Promise<StudyRoom> {
     const startDate = new Date(dto.startDate);
     const endDate = new Date(dto.endDate);
     assertValidPeriod(startDate, endDate);
 
-    const room = await this.prisma.studyRoom.create({
-      data: { name: dto.name, maxPersonnel: dto.maxPersonnel, startDate, endDate },
+    const room = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.studyRoom.create({
+        data: { name: dto.name, maxPersonnel: dto.maxPersonnel, startDate, endDate },
+      });
+      await ensureSeats(tx, created.id, created.maxPersonnel);
+      return created;
     });
     return toStudyRoom(room, 0);
   }
 
   /**
    * FR-ROM-04, FR-ROM-06
-   * - 최대 인원은 현재 유효 신청 인원보다 작게 줄일 수 없다.
+   * - 최대 인원 = 좌석 수 (#45). 늘리면 좌석을 더 만들고, 줄이면 큰 번호 좌석부터 쓰지 않게 된다.
+   *   없어질 좌석에 아직 끝나지 않은 유효 신청이 있으면 줄일 수 없다 (학생 모르게 자리가 사라지지 않게).
    * - 운영 기간은 기존 유효 신청의 방문 구간을 모두 포함해야 한다.
    */
   async update(id: number, dto: UpdateStudyRoomDto): Promise<StudyRoom> {
@@ -68,14 +74,23 @@ export class StudyRoomsService {
       const endDate = dto.endDate ? new Date(dto.endDate) : current.endDate;
       assertValidPeriod(startDate, endDate);
 
-      const appliedCount = await tx.visit.count({ where: { studyRoomId: id, status: 'APPLIED' } });
-
-      if (maxPersonnel < appliedCount) {
-        throw new DomainException(
-          ErrorCode.CAPACITY_BELOW_CURRENT,
-          `현재 신청 인원(${appliedCount}명)보다 작게 줄일 수 없습니다.`,
-          HttpStatus.CONFLICT,
-        );
+      if (maxPersonnel < current.maxPersonnel) {
+        const inUse = await tx.seat.findMany({
+          where: {
+            studyRoomId: id,
+            number: { gt: maxPersonnel, lte: current.maxPersonnel },
+            visits: { some: { status: 'APPLIED', endAt: { gt: new Date() } } },
+          },
+          select: { number: true },
+          orderBy: { number: 'asc' },
+        });
+        if (inUse.length > 0) {
+          throw new DomainException(
+            ErrorCode.SEATS_IN_USE,
+            `없어질 좌석(${inUse.map((s) => `${s.number}번`).join(', ')})에 예약이 있어 ${maxPersonnel}석으로 줄일 수 없습니다.`,
+            HttpStatus.CONFLICT,
+          );
+        }
       }
 
       const periodChanged =
@@ -102,6 +117,8 @@ export class StudyRoomsService {
         where: { id },
         data: { name: dto.name, maxPersonnel, startDate, endDate },
       });
+      await ensureSeats(tx, id, maxPersonnel);
+      const appliedCount = await tx.visit.count({ where: { studyRoomId: id, status: 'APPLIED' } });
       return toStudyRoom(room, appliedCount);
     });
   }
@@ -133,7 +150,7 @@ export class StudyRoomsService {
 
     const histories = await this.prisma.visitHistory.findMany({
       where: { studyRoomId: id },
-      include: { student: { select: { id: true, name: true } } },
+      include: { student: { select: { id: true, name: true } }, prevSeat: true, seat: true },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
     return histories.map(toStudyRoomHistory);
@@ -152,6 +169,7 @@ export class StudyRoomsService {
       where: { studyRoomId: id, status: 'APPLIED' },
       include: {
         student: { select: { id: true, name: true, phone: true } },
+        seat: true,
         // 재신청이면 마지막 APPLY 시각을 신청 시각으로 쓴다
         histories: {
           where: { action: 'APPLY' },

@@ -17,6 +17,9 @@ export const ErrorCode = {
   CAPACITY_FULL: 'CAPACITY_FULL',
   VISIT_ALREADY_CANCELED: 'VISIT_ALREADY_CANCELED',
   VISIT_ALREADY_STARTED: 'VISIT_ALREADY_STARTED',
+  SEAT_NOT_FOUND: 'SEAT_NOT_FOUND',
+  SEAT_TAKEN: 'SEAT_TAKEN',
+  SEATS_IN_USE: 'SEATS_IN_USE',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
