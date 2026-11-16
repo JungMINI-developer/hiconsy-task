@@ -16,6 +16,15 @@ export interface StudyRoom {
   maxPersonnel: number;
   /** 현재 유효 신청(APPLIED) 인원 */
   currentPersonnel: number;
+  /** 자리 제안 중(확정 대기)인 인원 — 정원 1자리씩 잡아 둔다 (#36) */
+  offeredCount: number;
+  /** 순번을 기다리는 대기 인원 */
+  waitingCount: number;
+  /**
+   * 새로 신청할 수 있는 자리 = 최대 인원 − 유효 신청 − 제안 중 − 대기 (0 이상).
+   * 대기자가 있으면 빈자리는 대기자에게 먼저 돌아가므로 새 신청자에게는 0이다.
+   */
+  availableSeats: number;
   startDate: IsoDateString;
   endDate: IsoDateString;
   createdAt: IsoDateString;

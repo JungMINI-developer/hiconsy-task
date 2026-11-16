@@ -6,13 +6,23 @@ import type {
   VisitHistory as VisitHistoryRow,
 } from '../generated/prisma/client.js';
 import { toKstIso, toKstIsoOrNull } from '../common/utils/date.js';
+import { availableSeats, type WaitlistCounts } from '../waitlist/waitlist-sync.js';
 
-export function toStudyRoom(row: StudyRoomRow, currentPersonnel: number): StudyRoom {
+const NO_WAITLIST: WaitlistCounts = { offered: 0, waiting: 0 };
+
+export function toStudyRoom(
+  row: StudyRoomRow,
+  currentPersonnel: number,
+  waitlist: WaitlistCounts = NO_WAITLIST,
+): StudyRoom {
   return {
     id: row.id,
     name: row.name,
     maxPersonnel: row.maxPersonnel,
     currentPersonnel,
+    offeredCount: waitlist.offered,
+    waitingCount: waitlist.waiting,
+    availableSeats: availableSeats(row.maxPersonnel, currentPersonnel, waitlist),
     startDate: toKstIso(row.startDate),
     endDate: toKstIso(row.endDate),
     createdAt: toKstIso(row.createdAt),

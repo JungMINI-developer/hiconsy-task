@@ -9,6 +9,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { StudentsModule } from './students/students.module.js';
 import { StudyRoomsModule } from './study-rooms/study-rooms.module.js';
 import { VisitsModule } from './visits/visits.module.js';
+import { WaitlistModule } from './waitlist/waitlist.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { VisitsModule } from './visits/visits.module.js';
     StudyRoomsModule,
     StudentsModule,
     VisitsModule,
+    WaitlistModule,
   ],
   controllers: [HealthController],
   providers: [

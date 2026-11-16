@@ -23,6 +23,22 @@ enum VisitAction {
   CANCEL
 }
 
+/// 대기열 항목 상태 (#36). WAITING·OFFERED가 진행 중, 나머지는 종료
+enum WaitlistStatus {
+  /// 순번 대기 중
+  WAITING
+  /// 자리 제안 중 — offer_expires_at 전까지 정원 1자리를 잡아 둔다
+  OFFERED
+  /// 제안을 확정해 방문 신청이 됨
+  CONFIRMED
+  /// 제안을 거절함
+  DECLINED
+  /// 제안이 만료됐거나 원하는 방문 시작이 지남
+  EXPIRED
+  /// 본인 취소, 또는 자습실·학생 삭제·운영 기간 변경으로 자동 취소
+  CANCELED
+}
+
 /// 이력을 남긴 주체. SYSTEM은 자습실 변경·삭제로 인한 자동 처리(FR-ROM-06) 용도
 enum ActorType {
   STUDENT
@@ -41,6 +57,7 @@ model Student {
 
   visits    Visit[]
   histories VisitHistory[]
+  waitlist  WaitlistEntry[]
 
   /// 삭제되지 않은 학생끼리만 전화번호 중복 불가 (삭제된 학생의 번호는 재등록 가능)
   @@unique([phone], map: "students_phone_active_key", where: { deletedAt: null })
@@ -61,6 +78,7 @@ model StudyRoom {
 
   visits    Visit[]
   histories VisitHistory[]
+  waitlist  WaitlistEntry[]
 
   @@index([deletedAt, startDate])
   @@map("study_rooms")
@@ -113,4 +131,34 @@ model VisitHistory {
   @@index([studentId, createdAt])
   @@index([visitId])
   @@map("visit_histories")
+}
+
+/// 대기열 (#36). 정원이 찬 자습실에 원하는 방문 시간으로 줄을 서고, 자리가 나면 순번대로 자리 제안을 받는다.
+/// 종료된 항목도 지우지 않는다 (같은 학생이 다시 대기하면 새 행).
+model WaitlistEntry {
+  id             Int            @id @default(autoincrement())
+  studentId      Int            @map("student_id")
+  studyRoomId    Int            @map("study_room_id")
+  /// 원하는 방문 구간 (확정할 때 바꿀 수 있다)
+  startAt        DateTime       @map("start_at") @db.Timestamptz(3)
+  endAt          DateTime       @map("end_at") @db.Timestamptz(3)
+  status         WaitlistStatus @default(WAITING)
+  offeredAt      DateTime?      @map("offered_at") @db.Timestamptz(3)
+  offerExpiresAt DateTime?      @map("offer_expires_at") @db.Timestamptz(3)
+  /// 진행 중(WAITING·OFFERED)이면 null, 끝나면 종료 시각
+  endedAt        DateTime?      @map("ended_at") @db.Timestamptz(3)
+  /// 종료 사유 (예: 제안 만료, 자습실 삭제)
+  endReason      String?        @map("end_reason") @db.VarChar(255)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  studyRoom StudyRoom @relation(fields: [studyRoomId], references: [id], onDelete: Restrict)
+
+  /// 학생-자습실 쌍당 진행 중(WAITING·OFFERED = ended_at IS NULL)인 대기는 1건
+  @@unique([studentId, studyRoomId], map: "waitlist_entries_active_key", where: { endedAt: null })
+  /// 순번 조회: 자습실별 진행 중 항목을 등록 순으로
+  @@index([studyRoomId, status, createdAt])
+  @@index([studentId, status])
+  @@map("waitlist_entries")
 }
