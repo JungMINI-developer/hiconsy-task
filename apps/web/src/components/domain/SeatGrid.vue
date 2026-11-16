@@ -87,7 +87,8 @@ function seatClass(seat: GridSeat) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-3">
+  <!-- 30석(6줄)이어도 다이얼로그가 화면을 넘지 않게 폭을 제한한다 (칸 최대 약 57px, 320px 화면에서는 44px) -->
+  <div class="mx-auto flex w-full max-w-80 flex-col gap-3">
     <ul class="flex flex-wrap gap-x-4 gap-y-1 text-caption text-fg-muted" aria-hidden="true">
       <li class="flex items-center gap-1.5">
         <span class="size-3.5 rounded-sm border border-line-input bg-surface" />빈 좌석
@@ -137,7 +138,7 @@ function seatClass(seat: GridSeat) {
           <slot name="seat" :seat="seat" :selected="seat.id === model">
             <Check
               v-if="seat.id === model"
-              class="absolute top-1 right-1 size-3.5"
+              class="absolute top-0.5 right-0.5 size-3"
               :stroke-width="3"
               aria-hidden="true"
             />

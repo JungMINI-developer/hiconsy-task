@@ -587,7 +587,8 @@ function handleError(e: unknown) {
       <p v-if="unchanged" class="-mb-2 text-caption text-fg-muted">
         바꿀 시간이나 좌석을 골라 주세요
       </p>
-      <div class="mt-2 flex gap-2">
+      <!-- 좌석이 많아 다이얼로그가 스크롤되어도 버튼은 아래에 붙어 보인다 -->
+      <div class="sticky -bottom-6 z-10 -mx-6 mt-2 -mb-6 flex gap-2 bg-surface px-6 pt-3 pb-6">
         <AppButton variant="secondary" size="lg" class="flex-1" @click="open = false"
           >닫기</AppButton
         >
