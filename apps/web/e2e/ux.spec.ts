@@ -119,20 +119,20 @@ test.describe('역할 선택', () => {
 });
 
 test.describe('학생 · 표기', () => {
-  test('정원 막대는 남은 자리만큼 차고, 오늘·내일은 상대 날짜로 보인다', async ({ page, seed }) => {
-    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 10 });
-    const others = await Promise.all(
-      Array.from({ length: 8 }, (_, i) => seed.student(`학생${i}`, `010-2000-00${10 + i}`)),
-    );
-    for (const [i, o] of others.entries())
-      await seed.visit(o.id, room.id, kst(1, 10 + i), kst(1, 11 + i));
+  test('자습실 카드는 좌석 수를 보여주고, 오늘·내일은 상대 날짜로 보인다', async ({
+    page,
+    seed,
+  }) => {
+    await seed.room({ name: 'A 자습실', maxPersonnel: 10 });
     const me = await seed.student('김하늘', '010-1111-1111');
     await enterAsStudent(page, me);
 
     await page.goto('/student/rooms');
     const card = page.getByRole('listitem').filter({ hasText: 'A 자습실' });
-    const meter = card.getByRole('meter', { name: '남은 자리' });
-    await expect(meter).toHaveAttribute('aria-valuenow', '2');
+    // 운영 시간이 아니면(내일) 좌석 수만, 정원 막대는 없다 (#49)
+    await expect(card).toContainText('좌석 10석');
+    await expect(card).not.toContainText('이용 중');
+    await expect(card.getByRole('meter')).toHaveCount(0);
     await expect(card).toContainText('내일 10:00 – 22:00');
   });
 
@@ -176,7 +176,8 @@ async function expectOpensBelow(page: Page, trigger: Locator) {
   const list = page.getByRole('listbox');
   await expect(list).toBeVisible();
   const l = (await list.boundingBox())!;
-  expect(l.y, '목록이 필드 아래에서 시작').toBeGreaterThanOrEqual(t.y + t.height);
+  // 다이얼로그 세로 가운데 정렬이 소수점 px에 걸리면 목록 위치가 정수 px로 반올림된다 (1px 허용)
+  expect(l.y, '목록이 필드 아래에서 시작').toBeGreaterThanOrEqual(t.y + t.height - 1);
   expect(l.y + l.height, '목록이 화면 안에').toBeLessThanOrEqual(page.viewportSize()!.height);
   await expect(page.getByRole('option', { selected: true })).toBeInViewport();
   await page.keyboard.press('Escape');

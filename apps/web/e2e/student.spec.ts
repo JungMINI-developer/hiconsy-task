@@ -2,14 +2,14 @@ import { enterAsStudent, expect, kst, test } from './support/fixtures';
 import { expectNoHorizontalScroll, nav, pick, toast } from './support/ui';
 
 test.describe('학생 · 방문 신청', () => {
-  test('신청 → 시간 변경 → 취소 → 다시 신청', async ({ page, seed }) => {
+  test('신청 → 시간 변경 → 취소 → 다시 신청 (좌석 포함)', async ({ page, seed }) => {
     await seed.room({ name: 'A 자습실', maxPersonnel: 5 });
     const me = await seed.student('김하늘', '010-1111-1111');
     await enterAsStudent(page, me);
 
     await page.goto('/student/rooms');
     const card = page.getByRole('listitem').filter({ hasText: 'A 자습실' });
-    await expect(card).toContainText('남은 자리 5 / 5');
+    await expect(card).toContainText('좌석 5석'); // 내일 운영이라 "지금 이용 중"은 없다
     await expectNoHorizontalScroll(page);
 
     // 신청 — 운영 기간(내일 10:00–22:00) 안의 30분 단위만 고를 수 있다
@@ -18,18 +18,25 @@ test.describe('학생 · 방문 신청', () => {
     await expect(dialog.getByRole('combobox', { name: '방문 시작 시각' })).toHaveText('10:00');
     await pick(page, dialog.getByRole('combobox', { name: '방문 시작 시각' }), '11:00');
     await pick(page, dialog.getByRole('combobox', { name: '방문 종료 시각' }), '13:00');
+    // 좌석: 가장 작은 번호가 미리 골라져 있고, 다른 좌석을 고를 수 있다
+    await expect(dialog).toContainText('이 시간 빈 좌석 5석');
+    await expect(dialog).toContainText('1번 좌석에 앉아요');
+    await dialog.getByRole('radio', { name: '3번 좌석, 비어 있음' }).click();
+    await expect(dialog).toContainText('3번 좌석에 앉아요');
+    await expectNoHorizontalScroll(page);
     await dialog.getByRole('button', { name: '신청하기' }).click();
 
     await expect(toast(page, /방문을 신청했어요\. .* 11:00 – 13:00/)).toBeVisible();
     await expect(card).toContainText('신청함');
-    await expect(card).toContainText('11:00 – 13:00');
-    await expect(card).toContainText('남은 자리 4 / 5');
+    await expect(card).toContainText('11:00 – 13:00 · 3번 좌석');
     // 헤더 "내 신청" 배지
     await expect(nav(page).getByRole('link', { name: /내 신청.*1/ })).toBeVisible();
 
-    // 시간 변경 — 그대로면 변경 버튼 비활성
+    // 시간 변경 — 지금 좌석이 골라져 있고, 그대로면 변경 버튼 비활성
     await card.getByRole('button', { name: '시간 변경' }).click();
     const edit = page.getByRole('dialog', { name: 'A 자습실 시간 변경' });
+    await expect(edit).toContainText('11:00 – 13:00 · 3번 좌석');
+    await expect(edit.getByRole('radio', { name: '3번 좌석, 비어 있음, 내 좌석' })).toBeChecked();
     await expect(edit.getByRole('button', { name: '변경하기' })).toBeDisabled();
     await pick(page, edit.getByRole('combobox', { name: '방문 시작 시각' }), '12:00');
     await edit.getByRole('button', { name: '변경하기' }).click();
@@ -42,6 +49,7 @@ test.describe('학생 · 방문 신청', () => {
     await expect(page).toHaveURL('/student/visits');
     const visit = page.getByRole('listitem').filter({ hasText: 'A 자습실' });
     await expect(visit).toContainText('12:00 – 13:00');
+    await expect(visit).toContainText('3번 좌석');
     await visit.getByRole('button', { name: '취소' }).click();
     const confirm = page.getByRole('alertdialog', { name: '방문을 취소할까요?' });
     await expect(confirm).toContainText('A 자습실');
@@ -50,13 +58,12 @@ test.describe('학생 · 방문 신청', () => {
     await expect(page.getByText('아직 신청한 방문이 없어요')).toBeVisible();
     await expect(nav(page).getByRole('link', { name: /내 신청.*1/ })).toHaveCount(0);
 
-    // 다시 신청
+    // 다시 신청 — 이전 좌석(3번)이 미리 골라져 있다
     await page.getByRole('tab', { name: /취소됨/ }).click();
     await page.getByRole('button', { name: '다시 신청' }).click();
-    await page
-      .getByRole('dialog', { name: 'A 자습실 방문 신청' })
-      .getByRole('button', { name: '신청하기' })
-      .click();
+    const reapply = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
+    await expect(reapply).toContainText('3번 좌석에 앉아요');
+    await reapply.getByRole('button', { name: '신청하기' }).click();
     await expect(toast(page, /방문을 신청했어요/)).toBeVisible();
     await expect(page.getByRole('tab', { name: /예정\s*1/ })).toHaveAttribute(
       'aria-selected',
@@ -64,43 +71,88 @@ test.describe('학생 · 방문 신청', () => {
     );
   });
 
-  test('정원이 찬 자습실은 신청 버튼이 비활성이고 이유를 보여준다', async ({ page, seed }) => {
-    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 1 });
+  test('남은 시간 내내 빈 좌석이 없으면 신청 버튼이 비활성이고 이유를 보여준다', async ({
+    page,
+    seed,
+  }) => {
+    const full = await seed.room({ name: 'A 자습실', maxPersonnel: 1 });
+    const partly = await seed.room({ name: 'B 자습실', maxPersonnel: 1 });
     const other = await seed.student('이도윤', '010-2222-2222');
-    await seed.visit(other.id, room.id, kst(1, 11), kst(1, 12));
+    const third = await seed.student('박서준', '010-3333-3333');
+    await seed.visit(other.id, full.id, kst(1, 10), kst(1, 22)); // 운영 시간 내내
+    await seed.visit(third.id, partly.id, kst(1, 10), kst(1, 21)); // 21~22시는 빈다
     const me = await seed.student('김하늘', '010-1111-1111');
     await enterAsStudent(page, me);
 
     await page.goto('/student/rooms');
-    const card = page.getByRole('listitem').filter({ hasText: 'A 자습실' });
-    await expect(card).toContainText('정원 마감');
-    await expect(card.getByRole('button', { name: '방문 신청' })).toBeDisabled();
-    await expect(card.getByRole('button', { name: '방문 신청' })).toHaveAccessibleDescription(
-      '정원이 다 찼어요',
+    const a = page.getByRole('listitem').filter({ hasText: 'A 자습실' });
+    await expect(a.getByRole('button', { name: '방문 신청' })).toBeDisabled();
+    await expect(a.getByRole('button', { name: '방문 신청' })).toHaveAccessibleDescription(
+      '남은 시간에 빈 좌석이 없어요',
     );
+    await expect(a).not.toContainText('정원 마감');
+    // 한 칸이라도 비면 신청할 수 있다
+    const b = page.getByRole('listitem').filter({ hasText: 'B 자습실' });
+    await expect(b.getByRole('button', { name: '방문 신청' })).toBeEnabled();
   });
 
-  test('다이얼로그를 연 사이 정원이 차면 알려주고 목록을 갱신한다', async ({ page, seed }) => {
-    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 1 });
+  test('시간을 바꿔 고른 좌석이 그 시간에 차 있으면 선택을 풀고 알린다', async ({ page, seed }) => {
+    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 2 });
+    const other = await seed.student('이도윤', '010-2222-2222');
+    await seed.visit(other.id, room.id, kst(1, 14), kst(1, 16)); // 1번 좌석 14~16시
+    const me = await seed.student('김하늘', '010-1111-1111');
+    await enterAsStudent(page, me);
+
+    await page.goto(`/student/rooms?apply=${room.id}`);
+    const dialog = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
+    await expect(dialog).toContainText('1번 좌석에 앉아요'); // 10~12시엔 비어 있다
+
+    await pick(page, dialog.getByRole('combobox', { name: '방문 시작 시각' }), '14:00');
+    await expect(
+      toast(page, '그 시간에는 다른 학생이 이미 예약한 좌석이에요. 다른 좌석을 골라 주세요'),
+    ).toBeVisible();
+    await expect(dialog.getByRole('radio', { name: '1번 좌석, 예약됨' })).toBeVisible();
+    await expect(dialog).toContainText('앉을 좌석을 골라 주세요');
+    await expect(dialog.getByRole('button', { name: '신청하기' })).toBeDisabled();
+
+    await dialog.getByRole('radio', { name: '2번 좌석, 비어 있음' }).click();
+    await dialog.getByRole('button', { name: '신청하기' }).click();
+    await expect(toast(page, /방문을 신청했어요/)).toBeVisible();
+  });
+
+  test('신청하는 순간 고른 좌석을 다른 학생이 가져가면 다이얼로그에 남아 다시 고른다', async ({
+    page,
+    seed,
+  }) => {
+    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 2 });
     const me = await seed.student('김하늘', '010-1111-1111');
     const other = await seed.student('이도윤', '010-2222-2222');
     await enterAsStudent(page, me);
 
     await page.goto(`/student/rooms?apply=${room.id}`);
     const dialog = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
-    await expect(dialog).toBeVisible();
-    // 다른 학생이 같은 시간(기본 선택 10:00–12:00)의 마지막 좌석을 먼저 가져감
+    await expect(dialog).toContainText('1번 좌석에 앉아요');
+    // 다른 학생이 같은 시간(기본 10:00–12:00)의 1번 좌석을 먼저 가져감
     await seed.visit(other.id, room.id, kst(1, 10), kst(1, 12));
     await dialog.getByRole('button', { name: '신청하기' }).click();
 
-    await expect(toast(page, '방금 정원이 다 찼어요. 다른 자습실을 골라 주세요')).toBeVisible();
-    await expect(dialog).toBeHidden();
-    await expect(page.getByRole('listitem').filter({ hasText: 'A 자습실' })).toContainText(
-      '정원 마감',
-    );
+    const notice = '방금 다른 학생이 1번 좌석을 예약했어요. 다른 좌석을 골라 주세요';
+    await expect(toast(page, notice)).toBeVisible();
+    // 모달 밖 토스트는 스크린리더에 가려지므로 다이얼로그 안 라이브 영역도 같은 문구를 읽는다
+    await expect(dialog.getByText(notice)).toBeAttached();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('radio', { name: '1번 좌석, 예약됨' })).toBeVisible();
+    await expect(dialog).toContainText('이 시간 빈 좌석 1석');
+
+    await dialog.getByRole('radio', { name: '2번 좌석, 비어 있음' }).click();
+    await dialog.getByRole('button', { name: '신청하기' }).click();
+    await expect(toast(page, /방문을 신청했어요/)).toBeVisible();
   });
 
-  test('정원이 차면 같은 시간에 자리가 남은 자습실로 이어서 신청한다', async ({ page, seed }) => {
+  test('고른 시간에 빈 좌석이 없으면 같은 시간에 빈 좌석이 있는 자습실로 이어서 신청한다', async ({
+    page,
+    seed,
+  }) => {
     const roomA = await seed.room({ name: 'A 자습실', maxPersonnel: 1 });
     const roomB = await seed.room({ name: 'B 자습실', maxPersonnel: 5 });
     const roomC = await seed.room({ name: 'C 자습실', maxPersonnel: 1 });
@@ -108,22 +160,25 @@ test.describe('학생 · 방문 신청', () => {
     const me = await seed.student('김하늘', '010-1111-1111');
     const other = await seed.student('이도윤', '010-2222-2222');
     const third = await seed.student('박서준', '010-3333-3333');
-    await seed.visit(third.id, roomC.id, kst(1, 10), kst(1, 12)); // C는 그 시간에 이미 마감
+    await seed.visit(other.id, roomA.id, kst(1, 10), kst(1, 12)); // A는 기본 시간에 마감
+    await seed.visit(third.id, roomC.id, kst(1, 10), kst(1, 12)); // C도 그 시간에 마감
     await enterAsStudent(page, me);
 
-    // 기본 선택(10:00–12:00)으로 A 신청 → 그 사이 다른 학생이 같은 시간의 마지막 좌석을 가져감
     await page.goto(`/student/rooms?apply=${roomA.id}`);
     const applyA = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
     await expect(applyA.getByRole('combobox', { name: '방문 시작 시각' })).toHaveText('10:00');
-    await seed.visit(other.id, roomA.id, kst(1, 10), kst(1, 12));
-    await applyA.getByRole('button', { name: '신청하기' }).click();
+    await expect(applyA).toContainText('그 시간 내내 비어 있는 좌석이 없어요');
+    await expect(applyA.getByRole('button', { name: '신청하기' })).toBeDisabled();
+    await applyA.getByRole('button', { name: '같은 시간에 빈 좌석이 있는 자습실 보기' }).click();
 
-    // 같은 시간에 자리가 있는 곳만 안내 (C는 마감, D는 운영 기간 밖)
-    const alternatives = page.getByRole('dialog', { name: 'A 자습실 정원이 방금 찼어요' });
+    // 같은 시간에 빈 좌석이 있는 곳만 안내 (C는 마감, D는 운영 기간 밖)
+    const alternatives = page.getByRole('dialog', {
+      name: '그 시간에 A 자습실에는 빈 좌석이 없어요',
+    });
     await expect(alternatives).toContainText('10:00 – 12:00');
     await expect(alternatives.getByRole('listitem')).toHaveCount(1);
     await expect(alternatives).toContainText('B 자습실');
-    await expect(alternatives).toContainText('남은 자리 5 / 5');
+    await expect(alternatives).toContainText('빈 좌석 5석 / 5석');
 
     // 고른 자습실의 신청 다이얼로그가 같은 시간으로 열린다
     await alternatives.getByRole('button', { name: 'B 자습실 이 시간으로 신청' }).click();
@@ -131,6 +186,7 @@ test.describe('학생 · 방문 신청', () => {
     const applyB = page.getByRole('dialog', { name: 'B 자습실 방문 신청' });
     await expect(applyB.getByRole('combobox', { name: '방문 시작 시각' })).toHaveText('10:00');
     await expect(applyB.getByRole('combobox', { name: '방문 종료 시각' })).toHaveText('12:00');
+    await expect(applyB).toContainText('1번 좌석에 앉아요');
     await applyB.getByRole('button', { name: '신청하기' }).click();
 
     await expect(toast(page, /방문을 신청했어요\. .* 10:00 – 12:00/)).toBeVisible();
@@ -140,7 +196,24 @@ test.describe('학생 · 방문 신청', () => {
     );
   });
 
-  test('다시 신청이 정원 마감으로 거절되면 자습실 목록에서 같은 시간으로 이어서 신청한다', async ({
+  test('같은 시간에 빈 좌석이 있는 자습실이 없으면 알리고 신청 다이얼로그에 남는다', async ({
+    page,
+    seed,
+  }) => {
+    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 1 });
+    const other = await seed.student('이도윤', '010-2222-2222');
+    await seed.visit(other.id, room.id, kst(1, 10), kst(1, 12));
+    const me = await seed.student('김하늘', '010-1111-1111');
+    await enterAsStudent(page, me);
+
+    await page.goto(`/student/rooms?apply=${room.id}`);
+    const dialog = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
+    await dialog.getByRole('button', { name: '같은 시간에 빈 좌석이 있는 자습실 보기' }).click();
+    await expect(toast(page, '같은 시간에 빈 좌석이 있는 자습실이 없어요')).toBeVisible();
+    await expect(dialog).toBeVisible();
+  });
+
+  test('다시 신청할 시간에 빈 좌석이 없으면 자습실 목록에서 같은 시간으로 이어서 신청한다', async ({
     page,
     seed,
   }) => {
@@ -150,19 +223,39 @@ test.describe('학생 · 방문 신청', () => {
     const other = await seed.student('이도윤', '010-2222-2222');
     const mine = await seed.visit(me.id, roomA.id, kst(1, 11), kst(1, 12));
     await seed.cancelVisit(me.id, mine.id);
+    await seed.visit(other.id, roomA.id, kst(1, 10), kst(1, 12));
     await enterAsStudent(page, me);
 
     await page.goto(`/student/visits?apply=${roomA.id}`);
     const reapply = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
-    await expect(reapply).toBeVisible();
-    // 다시 신청하려는 시간과 겹치게 다른 학생이 마지막 좌석을 가져감
-    await seed.visit(other.id, roomA.id, kst(1, 10), kst(1, 12));
-    await reapply.getByRole('button', { name: '신청하기' }).click();
+    await reapply.getByRole('button', { name: '같은 시간에 빈 좌석이 있는 자습실 보기' }).click();
 
-    const alternatives = page.getByRole('dialog', { name: 'A 자습실 정원이 방금 찼어요' });
+    const alternatives = page.getByRole('dialog', {
+      name: '그 시간에 A 자습실에는 빈 좌석이 없어요',
+    });
     await alternatives.getByRole('button', { name: 'B 자습실 이 시간으로 신청' }).click();
     await expect(page).toHaveURL(/\/student\/rooms\?apply=\d+&slot=/);
     await expect(page.getByRole('dialog', { name: 'B 자습실 방문 신청' })).toBeVisible();
+  });
+
+  test('좌석은 방향키로 움직이며 고르고 예약된 좌석은 건너뛴다', async ({ page, seed }) => {
+    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 10 });
+    const other = await seed.student('이도윤', '010-2222-2222');
+    await seed.visit(other.id, room.id, kst(1, 10), kst(1, 12)); // 1번 좌석
+    const me = await seed.student('김하늘', '010-1111-1111');
+    await enterAsStudent(page, me);
+
+    await page.goto(`/student/rooms?apply=${room.id}`);
+    const dialog = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
+    await expect(dialog).toContainText('2번 좌석에 앉아요'); // 1번은 예약됨
+    const seats = dialog.getByRole('radiogroup', { name: '좌석' });
+    await seats.getByRole('radio', { name: '2번 좌석, 비어 있음' }).focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(dialog).toContainText('7번 좌석에 앉아요');
+    await expect(seats.getByRole('radio', { name: '7번 좌석, 비어 있음' })).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowLeft'); // 1번은 예약됨 → 그대로
+    await expect(dialog).toContainText('2번 좌석에 앉아요');
   });
 
   test('내 다른 신청과 겹치는 시간은 고를 수 없다', async ({ page, seed }) => {
