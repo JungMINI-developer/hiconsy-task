@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { ErrorCode, type Visit } from '@hiconsy/shared';
 import { ChevronLeft } from 'lucide-vue-next';
@@ -229,26 +229,6 @@ function findOtherRooms() {
   if (r && range) void full.onFull({ room: r, ...range });
 }
 
-// ── 하단 고정 바 ────────────────────────────────────────
-/**
- * 토스트가 하단 바(특히 모바일의 넓은 버튼)를 가리지 않도록, 바 높이만큼 토스트 영역을 올린다
- * (AppToaster가 --toast-offset을 쓴다).
- */
-const actionBar = ref<HTMLElement | null>(null);
-const barObserver = new ResizeObserver(([entry]) => {
-  const height = entry?.borderBoxSize[0]?.blockSize ?? 0;
-  document.documentElement.style.setProperty('--toast-offset', `${height}px`);
-});
-watch(actionBar, (el, prev) => {
-  if (prev) barObserver.unobserve(prev);
-  if (el) barObserver.observe(el);
-  else document.documentElement.style.removeProperty('--toast-offset');
-});
-onBeforeUnmount(() => {
-  barObserver.disconnect();
-  document.documentElement.style.removeProperty('--toast-offset');
-});
-
 // ── 변경 모드 (?edit=1) ─────────────────────────────────
 const timeBar = ref<HTMLElement | null>(null);
 const seatSection = ref<HTMLElement | null>(null);
@@ -390,7 +370,7 @@ function handleSaveError(e: unknown) {
       <AppSkeleton class="h-96 rounded-xl" />
     </div>
 
-    <div v-else class="flex flex-col gap-3 pb-24">
+    <div v-else class="flex flex-col gap-3">
       <AppAlert v-if="formError" :message="formError.message">
         <RouterLink
           v-if="formError.showMyVisits"
@@ -475,89 +455,84 @@ function handleSaveError(e: unknown) {
             </AppButton>
           </div>
         </template>
-      </section>
-    </div>
-
-    <!-- 하단 고정: 신청 [신청하기] / 보기 [시간 변경][좌석 변경] / 변경 모드 [취소][변경하기] -->
-    <div
-      v-if="room && !notFound"
-      ref="actionBar"
-      data-testid="room-action-bar"
-      class="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur"
-    >
-      <div
-        class="mx-auto flex w-full max-w-content flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6"
-      >
-        <p class="min-w-0 text-body tabular-nums">
-          <template v-if="editing">
-            <span v-if="changeText" class="font-medium">{{ changeText }}</span>
-            <span v-else class="text-fg-muted">바꿀 시간이나 좌석을 골라 주세요</span>
-          </template>
-          <template v-else-if="myVisit">
-            <span class="text-label text-status-applied">내 방문</span>
-            {{ visitText(myVisit)
-            }}<template v-if="myVisit.seat"> · {{ myVisit.seat.number }}번 좌석</template>
-          </template>
-          <span v-else-if="blocked" :id="`blocked-${id}`" class="text-fg-muted">{{ blocked }}</span>
-          <template v-else-if="seat.selectedSeat.value && picker.selected.value">
-            <span class="font-medium">{{ seat.selectedSeat.value.number }}번 좌석</span>
-            · {{ visitText(picker.selected.value) }}
-          </template>
-          <span v-else class="text-fg-muted">앉을 좌석을 골라 주세요</span>
-        </p>
-
-        <div v-if="editing" class="flex w-full gap-2 sm:w-auto">
-          <AppButton
-            variant="secondary"
-            size="lg"
-            class="flex-1 sm:flex-none"
-            :disabled="saving"
-            @click="exitEdit"
-          >
-            취소
-          </AppButton>
-          <AppButton
-            size="lg"
-            class="flex-1 sm:flex-none"
-            :loading="saving"
-            :disabled="!canSave"
-            @click="saveChange"
-          >
-            변경하기
-          </AppButton>
-        </div>
-        <div v-else-if="myVisit" class="flex w-full gap-2 sm:w-auto">
-          <AppButton
-            variant="secondary"
-            size="lg"
-            class="flex-1 sm:flex-none"
-            :disabled="!isVisitEditable(myVisit)"
-            @click="enterEdit('time')"
-          >
-            시간 변경
-          </AppButton>
-          <AppButton
-            variant="secondary"
-            size="lg"
-            class="flex-1 sm:flex-none"
-            :disabled="!isVisitEditable(myVisit)"
-            @click="enterEdit('seat')"
-          >
-            좌석 변경
-          </AppButton>
-        </div>
-        <AppButton
-          v-else
-          size="lg"
-          class="w-full sm:w-auto"
-          :loading="saving"
-          :disabled="!canApply"
-          :aria-describedby="blocked ? `blocked-${id}` : undefined"
-          @click="apply"
+        <!-- 구분선 아래: 고른 좌석·시간(또는 내 방문·바뀐 것) + 오른쪽 아래 버튼 -->
+        <div
+          data-testid="room-action-bar"
+          class="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-t border-line pt-5"
         >
-          신청하기
-        </AppButton>
-      </div>
+          <p class="min-w-0 text-body tabular-nums">
+            <template v-if="editing">
+              <span v-if="changeText" class="font-medium">{{ changeText }}</span>
+              <span v-else class="text-fg-muted">바꿀 시간이나 좌석을 골라 주세요</span>
+            </template>
+            <template v-else-if="myVisit">
+              <span class="text-label text-status-applied">내 방문</span>
+              {{ visitText(myVisit)
+              }}<template v-if="myVisit.seat"> · {{ myVisit.seat.number }}번 좌석</template>
+            </template>
+            <span v-else-if="blocked" :id="`blocked-${id}`" class="text-fg-muted">{{
+              blocked
+            }}</span>
+            <template v-else-if="seat.selectedSeat.value && picker.selected.value">
+              <span class="font-medium">{{ seat.selectedSeat.value.number }}번 좌석</span>
+              · {{ visitText(picker.selected.value) }}
+            </template>
+            <span v-else class="text-fg-muted">앉을 좌석을 골라 주세요</span>
+          </p>
+
+          <div v-if="editing" class="flex w-full gap-2 sm:w-auto">
+            <AppButton
+              variant="secondary"
+              size="lg"
+              class="flex-1 sm:flex-none"
+              :disabled="saving"
+              @click="exitEdit"
+            >
+              취소
+            </AppButton>
+            <AppButton
+              size="lg"
+              class="flex-1 sm:flex-none"
+              :loading="saving"
+              :disabled="!canSave"
+              @click="saveChange"
+            >
+              변경하기
+            </AppButton>
+          </div>
+          <div v-else-if="myVisit" class="flex w-full gap-2 sm:w-auto">
+            <AppButton
+              variant="secondary"
+              size="lg"
+              class="flex-1 sm:flex-none"
+              :disabled="!isVisitEditable(myVisit)"
+              @click="enterEdit('time')"
+            >
+              시간 변경
+            </AppButton>
+            <AppButton
+              variant="secondary"
+              size="lg"
+              class="flex-1 sm:flex-none"
+              :disabled="!isVisitEditable(myVisit)"
+              @click="enterEdit('seat')"
+            >
+              좌석 변경
+            </AppButton>
+          </div>
+          <AppButton
+            v-else
+            size="lg"
+            class="w-full sm:w-auto"
+            :loading="saving"
+            :disabled="!canApply"
+            :aria-describedby="blocked ? `blocked-${id}` : undefined"
+            @click="apply"
+          >
+            신청하기
+          </AppButton>
+        </div>
+      </section>
     </div>
 
     <AlternativeRoomsDialog

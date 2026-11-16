@@ -36,7 +36,7 @@ const { toasts, dismiss } = useToast();
     <!-- 기본 이름이 영어(Notifications (F8))라 스크린 리더용으로 한국어 이름을 준다 -->
     <ToastViewport
       label="알림 ({hotkey})"
-      class="fixed inset-x-0 bottom-[var(--toast-offset,0px)] z-50 mx-auto my-0 flex w-full max-w-lg list-none flex-col items-center gap-2 p-4 outline-none sm:pb-6"
+      class="fixed inset-x-0 bottom-0 z-50 mx-auto my-0 flex w-full max-w-lg list-none flex-col items-center gap-2 p-4 outline-none sm:pb-6"
     />
   </ToastProvider>
 </template>
