@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatDate,
+  formatCountdown,
   formatDuration,
   formatDateTime,
   formatRange,
@@ -87,5 +88,16 @@ describe('datetime', () => {
       '1시간 30분',
     );
     expect(formatDuration('2026-11-20T18:00:00+09:00', '2026-11-20T18:30:00+09:00')).toBe('30분');
+  });
+});
+
+describe('formatCountdown', () => {
+  const now = new Date('2026-11-20T10:00:00+09:00');
+  it('남은 시간을 M:SS로, 초는 올림한다', () => {
+    expect(formatCountdown('2026-11-20T10:10:00+09:00', now)).toBe('10:00');
+    expect(formatCountdown('2026-11-20T10:01:05.200+09:00', now)).toBe('1:06');
+  });
+  it('지났으면 0:00', () => {
+    expect(formatCountdown('2026-11-20T09:59:00+09:00', now)).toBe('0:00');
   });
 });

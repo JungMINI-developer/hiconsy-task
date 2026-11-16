@@ -13,11 +13,18 @@ function room(id: number, overrides: Partial<StudyRoom> = {}): StudyRoom {
     name: `${id}번 자습실`,
     maxPersonnel: 5,
     currentPersonnel: 0,
+    offeredCount: 0,
+    waitingCount: 0,
+    availableSeats: 5,
     startDate: '2026-11-20T09:00:00+09:00',
     endDate: '2026-11-20T22:00:00+09:00',
     createdAt: '2026-11-01T00:00:00+09:00',
     updatedAt: '2026-11-01T00:00:00+09:00',
     ...overrides,
+    // 대기가 없으면 남은 자리 = 최대 − 신청
+    ...(overrides.availableSeats === undefined && {
+      availableSeats: (overrides.maxPersonnel ?? 5) - (overrides.currentPersonnel ?? 0),
+    }),
   };
 }
 
@@ -51,6 +58,11 @@ describe('findAlternativeRooms', () => {
 
   it('정원이 찬 자습실은 뺀다', () => {
     const rooms = [room(2, { currentPersonnel: 5 }), room(3)];
+    expect(ids(findAlternativeRooms(rooms, range, [], 1, now))).toEqual([3]);
+  });
+
+  it('빈자리가 있어도 대기자 몫이면 뺀다 (대기자 우선, #36)', () => {
+    const rooms = [room(2, { currentPersonnel: 4, waitingCount: 1, availableSeats: 0 }), room(3)];
     expect(ids(findAlternativeRooms(rooms, range, [], 1, now))).toEqual([3]);
   });
 
