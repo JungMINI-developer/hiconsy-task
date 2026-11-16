@@ -7,14 +7,21 @@ import type {
   VisitHistory as VisitHistoryRow,
 } from '../generated/prisma/client.js';
 import { toKstIso, toKstIsoOrNull } from '../common/utils/date.js';
+import type { RoomSeatStatus } from '../seats/room-seat-status.js';
 import { toSeatRef } from '../seats/seat.mapper.js';
 
-export function toStudyRoom(row: StudyRoomRow, currentPersonnel: number): StudyRoom {
+export function toStudyRoom(
+  row: StudyRoomRow,
+  currentPersonnel: number,
+  seatStatus: RoomSeatStatus,
+): StudyRoom {
   return {
     id: row.id,
     name: row.name,
     maxPersonnel: row.maxPersonnel,
     currentPersonnel,
+    occupiedSeats: seatStatus.occupiedSeats,
+    hasFreeSlot: seatStatus.hasFreeSlot,
     startDate: toKstIso(row.startDate),
     endDate: toKstIso(row.endDate),
     createdAt: toKstIso(row.createdAt),

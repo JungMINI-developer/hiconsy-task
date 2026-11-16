@@ -277,6 +277,74 @@ describe('Seats (e2e)', () => {
     });
   });
 
+  describe('자습실 좌석 현황 (occupiedSeats·hasFreeSlot, #49)', () => {
+    const HOUR = 60 * 60 * 1000;
+    /** 지금 기준 h시간 뒤 (30분 경계로 내림해 신청 구간을 맞춘다) */
+    const fromNow = (h: number) => {
+      const base = Math.floor(Date.now() / (30 * 60 * 1000)) * 30 * 60 * 1000;
+      return new Date(base + h * HOUR);
+    };
+
+    /** 지금 운영 중인 자습실 (1시간 전 ~ 4시간 뒤) */
+    async function openRoomNow(maxPersonnel: number) {
+      return createRoomWithSeats(prisma, {
+        name: '운영 중 자습실',
+        maxPersonnel,
+        startDate: fromNow(-1),
+        endDate: fromNow(4),
+      });
+    }
+
+    /** 지난 시각이 섞인 신청이라 API 대신 DB에 직접 만든다 */
+    async function book(roomId: number, seatNumber: number, from: number, to: number) {
+      return prisma.visit.create({
+        data: {
+          studentId: await createStudent(),
+          studyRoomId: roomId,
+          seatId: await seatId(roomId, seatNumber),
+          startAt: fromNow(from),
+          endAt: fromNow(to),
+        },
+      });
+    }
+
+    const getRoom = async (id: number) =>
+      (await api().get(`/api/study-rooms/${id}`).expect(200)).body.data;
+
+    it('운영 중이면 지금 이용 중인 좌석 수를, 아니면 null을 준다', async () => {
+      const roomId = await openRoomNow(3);
+      await book(roomId, 1, -1, 1); // 지금 이용 중
+      await book(roomId, 2, 1, 2); // 나중
+      const canceled = await book(roomId, 3, -1, 1);
+      await prisma.visit.update({ where: { id: canceled.id }, data: { status: 'CANCELED' } });
+
+      expect(await getRoom(roomId)).toMatchObject({ occupiedSeats: 1, hasFreeSlot: true });
+      expect(await getRoom(await createRoom())).toMatchObject({ occupiedSeats: null }); // 2030년
+    });
+
+    it('남은 운영 시간 내내 모든 좌석이 차 있으면 hasFreeSlot = false', async () => {
+      const roomId = await openRoomNow(2);
+      await book(roomId, 1, -1, 4);
+      await book(roomId, 2, -1, 2);
+      await book(roomId, 2, 2, 4); // 2번 좌석도 이어서 끝까지
+
+      expect(await getRoom(roomId)).toMatchObject({ occupiedSeats: 2, hasFreeSlot: false });
+    });
+
+    it('좌석 하나에 30분이라도 틈이 있으면 hasFreeSlot = true (목록에서도 같다)', async () => {
+      const roomId = await openRoomNow(2);
+      await book(roomId, 1, -1, 4);
+      await book(roomId, 2, -1, 2);
+      await book(roomId, 2, 3, 4); // 2번 좌석은 2~3시간 뒤가 빈다
+
+      const list = (await api().get('/api/study-rooms').expect(200)).body.data;
+      expect(list.find((r: { id: number }) => r.id === roomId)).toMatchObject({
+        occupiedSeats: 2,
+        hasFreeSlot: true,
+      });
+    });
+  });
+
   describe('동시성', () => {
     it('같은 좌석에 10명이 동시에 같은 시간을 신청하면 1명만 성공한다', async () => {
       const roomId = await createRoom({ maxPersonnel: 5 });

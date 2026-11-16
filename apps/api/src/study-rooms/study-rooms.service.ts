@@ -7,6 +7,7 @@ import {
 } from '@hiconsy/shared';
 import { DomainException } from '../common/exceptions/domain.exception.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { computeRoomSeatStatus } from '../seats/room-seat-status.js';
 import { ensureSeats } from '../seats/seat-occupancy.js';
 import { CancelReason, cancelAppliedVisitsBySystem } from '../visits/visit-cancellation.js';
 import type { CreateStudyRoomDto } from './dto/create-study-room.dto.js';
@@ -30,7 +31,8 @@ export class StudyRoomsService {
       include: withAppliedCount,
       orderBy: [{ startDate: 'asc' }, { id: 'asc' }],
     });
-    return rooms.map((room) => toStudyRoom(room, room._count.visits));
+    const status = await computeRoomSeatStatus(this.prisma, rooms);
+    return rooms.map((room) => toStudyRoom(room, room._count.visits, status.get(room.id)!));
   }
 
   async findOne(id: number): Promise<StudyRoom> {
@@ -39,7 +41,8 @@ export class StudyRoomsService {
       include: withAppliedCount,
     });
     if (!room) throw studyRoomNotFound();
-    return toStudyRoom(room, room._count.visits);
+    const status = await computeRoomSeatStatus(this.prisma, [room]);
+    return toStudyRoom(room, room._count.visits, status.get(room.id)!);
   }
 
   /** FR-ROM-02: 최대 인원만큼 좌석 1~N번을 함께 만든다 (#45) */
@@ -55,7 +58,8 @@ export class StudyRoomsService {
       await ensureSeats(tx, created.id, created.maxPersonnel);
       return created;
     });
-    return toStudyRoom(room, 0);
+    const status = await computeRoomSeatStatus(this.prisma, [room]);
+    return toStudyRoom(room, 0, status.get(room.id)!);
   }
 
   /**
@@ -119,7 +123,8 @@ export class StudyRoomsService {
       });
       await ensureSeats(tx, id, maxPersonnel);
       const appliedCount = await tx.visit.count({ where: { studyRoomId: id, status: 'APPLIED' } });
-      return toStudyRoom(room, appliedCount);
+      const status = await computeRoomSeatStatus(tx, [room]);
+      return toStudyRoom(room, appliedCount, status.get(room.id)!);
     });
   }
 

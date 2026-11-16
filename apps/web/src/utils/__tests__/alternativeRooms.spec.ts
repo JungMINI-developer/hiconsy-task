@@ -13,6 +13,8 @@ function room(id: number, overrides: Partial<StudyRoom> = {}): StudyRoom {
     name: `${id}번 자습실`,
     maxPersonnel: 5,
     currentPersonnel: 0,
+    occupiedSeats: null,
+    hasFreeSlot: true,
     startDate: '2026-11-20T09:00:00+09:00',
     endDate: '2026-11-20T22:00:00+09:00',
     createdAt: '2026-11-01T00:00:00+09:00',
