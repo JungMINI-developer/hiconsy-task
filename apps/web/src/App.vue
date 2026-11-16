@@ -3,12 +3,10 @@ import { RouterView } from 'vue-router';
 import AppHeader from '@/components/layout/AppHeader.vue';
 import AppToaster from '@/components/ui/AppToaster.vue';
 import { useMyVisitsStore } from '@/stores/myVisits';
-import { useMyWaitlistStore } from '@/stores/myWaitlist';
 import { useSessionStore } from '@/stores/session';
 
 const session = useSessionStore();
 const myVisits = useMyVisitsStore();
-const myWaitlist = useMyWaitlistStore();
 </script>
 
 <template>
@@ -18,10 +16,7 @@ const myWaitlist = useMyWaitlistStore();
   >
     본문으로 건너뛰기
   </a>
-  <AppHeader
-    :active-visit-count="session.isStudent ? myVisits.upcomingCount : undefined"
-    :offer-count="session.isStudent ? myWaitlist.offers.length : undefined"
-  />
+  <AppHeader :active-visit-count="session.isStudent ? myVisits.upcomingCount : undefined" />
   <div id="content">
     <RouterView />
   </div>
