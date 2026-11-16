@@ -5,11 +5,9 @@ import type { StudyRoom, Visit } from '@hiconsy/shared';
 import { studyRoomsApi } from '@/api/studyRooms';
 import { visitsApi } from '@/api/visits';
 import { useAsync } from '@/composables/useAsync';
-import { useDialogQuery } from '@/composables/useDialogQuery';
-import { useHighlight, useRefetchOnVisible } from '@/composables/useRefetch';
+import { useRefetchOnVisible } from '@/composables/useRefetch';
 import { useStudentGuard } from '@/composables/useStudentGuard';
 import { useToast } from '@/composables/useToast';
-import { useVisitToast } from '@/composables/useVisitToast';
 import { isVisitEditable, useMyVisitsStore, visitGroup, type VisitGroup } from '@/stores/myVisits';
 import { useSessionStore } from '@/stores/session';
 import { cn } from '@/utils/cn';
@@ -23,7 +21,6 @@ import {
 import { errorMessage } from '@/utils/errorMessage';
 import { hasAvailableSlot } from '@/utils/visitSlots';
 import PageShell from '@/components/layout/PageShell.vue';
-import VisitTimeDialog from '@/components/domain/VisitTimeDialog.vue';
 import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppSkeleton from '@/components/ui/AppSkeleton.vue';
@@ -36,9 +33,7 @@ import { buttonVariants } from '@/components/ui/variants';
 const session = useSessionStore();
 const myVisits = useMyVisitsStore();
 const toast = useToast();
-const visitToast = useVisitToast();
 const handleStudentGone = useStudentGuard();
-const { highlightedId, highlight } = useHighlight();
 
 // 다시 신청 가능 여부를 알기 위해 자습실 목록도 함께 가져온다
 const page = useAsync(async () => {
@@ -106,23 +101,6 @@ function reapplyRoom(v: Visit): StudyRoom | null {
   return room;
 }
 
-// 시간 변경 (?edit=visitId). 다시 신청은 자습실 페이지에서 한다 (#49)
-const editDialog = useDialogQuery('edit');
-const editingVisit = computed(
-  () =>
-    myVisits.visits.find((v) => String(v.id) === editDialog.value.value && isVisitEditable(v)) ??
-    null,
-);
-const editOpen = computed({
-  get: () => !!editingVisit.value,
-  set: (v: boolean) => !v && editDialog.close(),
-});
-function onTimeChanged(visit: Visit) {
-  visitToast.updated(editingVisit.value, visit);
-  highlight(visit.id);
-  void refresh();
-}
-
 // 취소
 const canceling = ref<Visit | null>(null);
 const cancelBusy = ref(false);
@@ -186,12 +164,7 @@ async function confirmCancel() {
         <li
           v-for="visit in visible"
           :key="visit.id"
-          :class="
-            cn(
-              'flex flex-col gap-3 rounded-xl bg-surface p-4 sm:p-5',
-              highlightedId === visit.id && 'animate-highlight',
-            )
-          "
+          class="flex flex-col gap-3 rounded-xl bg-surface p-4 sm:p-5"
         >
           <div class="flex items-start justify-between gap-3">
             <!-- 가장 중요한 건 "언제 가는지" — 방문 시간을 크게, 자습실 이름은 위에 작게 -->
@@ -232,9 +205,17 @@ async function confirmCancel() {
           >
             <template v-if="tab === 'upcoming'">
               <template v-if="isVisitEditable(visit)">
-                <AppButton variant="secondary" size="sm" @click="editDialog.open(visit.id)">
-                  시간 변경
-                </AppButton>
+                <RouterLink
+                  :to="{
+                    name: 'student-room',
+                    params: { id: visit.studyRoom.id },
+                    query: { edit: '1' },
+                  }"
+                  :class="buttonVariants({ variant: 'secondary', size: 'sm' })"
+                  :aria-label="`${visit.studyRoom.name} 신청 변경`"
+                >
+                  변경
+                </RouterLink>
                 <AppButton variant="danger-weak" size="sm" @click="canceling = visit">
                   취소
                 </AppButton>
@@ -255,12 +236,6 @@ async function confirmCancel() {
       </ul>
     </template>
 
-    <VisitTimeDialog
-      v-model:open="editOpen"
-      :visit="editingVisit"
-      @saved="onTimeChanged"
-      @stale="refresh"
-    />
     <ConfirmDialog
       v-model:open="cancelOpen"
       title="방문을 취소할까요?"

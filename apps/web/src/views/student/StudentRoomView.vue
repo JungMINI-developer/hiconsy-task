@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { ErrorCode, type Visit } from '@hiconsy/shared';
 import { ChevronLeft } from 'lucide-vue-next';
 import { AppError } from '@/api/client';
 import { studyRoomsApi } from '@/api/studyRooms';
 import { visitsApi } from '@/api/visits';
 import { useAsync } from '@/composables/useAsync';
-import { useDialogQuery } from '@/composables/useDialogQuery';
 import { useFullRoomFallback } from '@/composables/useFullRoomFallback';
 import { useAutoRefresh, useRefetchOnVisible } from '@/composables/useRefetch';
 import { useSeatPicker } from '@/composables/useSeatPicker';
@@ -26,11 +25,11 @@ import {
   toIsoWithOffset,
 } from '@/utils/datetime';
 import { errorMessage } from '@/utils/errorMessage';
+import { visitChangeText } from '@/utils/visitChange';
 import { decodeSlot, hasAvailableSlot } from '@/utils/visitSlots';
 import PageShell from '@/components/layout/PageShell.vue';
 import AlternativeRoomsDialog from '@/components/domain/AlternativeRoomsDialog.vue';
 import SeatGrid from '@/components/domain/SeatGrid.vue';
-import VisitTimeDialog from '@/components/domain/VisitTimeDialog.vue';
 import VisitTimeFields from '@/components/domain/VisitTimeFields.vue';
 import AppAlert from '@/components/ui/AppAlert.vue';
 import AppButton from '@/components/ui/AppButton.vue';
@@ -42,12 +41,15 @@ import { buttonVariants } from '@/components/ui/variants';
 /**
  * S-22 학생 · 자습실 페이지 `/student/rooms/:id` (#49)
  * 위 얇은 헤더에서 날짜·방문 시간을 고르고, 아래 큰 좌석 현황에서 좌석을 고른 뒤
- * 하단 [신청하기]로 신청한다. 이미 신청한 자습실이면 내 좌석을 보여주고 하단 버튼은 [시간 변경].
+ * 하단 [신청하기]로 신청한다.
+ * 이미 신청한 자습실이면 내 시간·좌석을 보여주고, [시간 변경]·[좌석 변경]으로 **변경 모드**(`?edit=1`)에
+ * 들어가 시간과 좌석을 함께 바꾼다 (두 버튼은 같은 모드, 포커스만 다르다).
  * 좌석 현황은 30초마다 다시 받는다 (보는 동안 다른 학생이 신청할 수 있다).
  */
 const props = defineProps<{ id: number }>();
 
 const route = useRoute();
+const router = useRouter();
 const session = useSessionStore();
 const myVisits = useMyVisitsStore();
 const toast = useToast();
@@ -65,8 +67,14 @@ const notFound = computed(
     (!!room.value && getRoomPhase(room.value) === 'ended'),
 );
 
-/** 내 유효 신청 (있으면 신청 대신 시간 변경) */
+/** 내 유효 신청 (있으면 신청 대신 변경) */
 const myVisit = computed<Visit | null>(() => myVisits.activeByRoom.get(props.id) ?? null);
+/** 변경 모드: 내 신청이 있고 아직 시작 전일 때 `?edit=1` */
+const editing = computed(
+  () => route.query.edit === '1' && !!myVisit.value && isVisitEditable(myVisit.value),
+);
+/** 신청한 자습실을 보기만 하는 상태 (시간·좌석 고르기 꺼짐) */
+const viewOnly = computed(() => !!myVisit.value && !editing.value);
 
 // ── 시간 ───────────────────────────────────────────────
 const picker = useVisitTimePicker(room, myVisit);
@@ -241,20 +249,104 @@ onBeforeUnmount(() => {
   document.documentElement.style.removeProperty('--toast-offset');
 });
 
-// ── 시간 변경 (?edit=visitId) ───────────────────────────
-const editDialog = useDialogQuery('edit');
-const editingVisit = computed(() =>
-  myVisit.value && String(myVisit.value.id) === editDialog.value.value ? myVisit.value : null,
-);
-const editOpen = computed({
-  get: () => !!editingVisit.value,
-  set: (v: boolean) => !v && editDialog.close(),
+// ── 변경 모드 (?edit=1) ─────────────────────────────────
+const timeBar = ref<HTMLElement | null>(null);
+const seatSection = ref<HTMLElement | null>(null);
+
+/** 내 신청의 시간·좌석으로 되돌린다 */
+function resetToMyVisit() {
+  const visit = myVisit.value;
+  if (!visit) return;
+  picker.reset({ visit });
+  seat.seatId.value = visit.seat?.id ?? null;
+}
+
+/** [시간 변경]은 시간 헤더에, [좌석 변경]은 좌석 현황에 포커스를 둔다 */
+async function enterEdit(target: 'time' | 'seat') {
+  resetToMyVisit();
+  formError.value = null;
+  await router.replace({ query: { ...route.query, edit: '1' } });
+  await nextTick();
+  const el =
+    target === 'time'
+      ? timeBar.value?.querySelector<HTMLElement>('[aria-label="방문 시작 시각"]')
+      : seatSection.value?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]');
+  el?.focus();
+}
+
+/** 주소에서 `edit`만 뺀 쿼리 */
+function queryWithoutEdit() {
+  const query = { ...route.query };
+  delete query.edit;
+  return query;
+}
+
+async function exitEdit() {
+  await router.replace({ query: queryWithoutEdit() });
+  resetToMyVisit();
+}
+
+/** 바뀐 것만 `3번 → 7번 좌석 · 11:00 – 13:00 → 12:00 – 14:00` */
+const changeText = computed(() => {
+  const visit = myVisit.value;
+  const range = picker.selected.value;
+  if (!editing.value || !visit || !range) return '';
+  return visitChangeText(
+    { startAt: visit.startAt, endAt: visit.endAt, seatNumber: visit.seat?.number ?? null },
+    { ...range, seatNumber: seat.selectedSeat.value?.number ?? null },
+  );
 });
-function onTimeChanged(visit: Visit) {
-  visitToast.updated(myVisit.value, visit);
-  void refresh().then(() => {
-    picker.reset({ visit });
-  });
+const canSave = computed(
+  () =>
+    editing.value &&
+    !!changeText.value &&
+    seat.seatId.value !== null &&
+    !seat.loading.value &&
+    !picker.conflict.value,
+);
+
+async function saveChange() {
+  const studentId = session.studentId;
+  const visit = myVisit.value;
+  const range = picker.selected.value;
+  if (!canSave.value || studentId === null || !visit || !range || seat.seatId.value === null) {
+    return;
+  }
+  formError.value = null;
+  saving.value = true;
+  try {
+    const saved = await visitsApi.updateTime(studentId, visit.id, {
+      startAt: toIsoWithOffset(range.startAt),
+      endAt: toIsoWithOffset(range.endAt),
+      seatId: seat.seatId.value,
+    });
+    visitToast.updated(visit, saved);
+    await router.replace({ query: queryWithoutEdit() });
+    await refresh();
+    resetToMyVisit();
+    void seat.reload('refresh');
+  } catch (e) {
+    handleSaveError(e);
+  } finally {
+    saving.value = false;
+  }
+}
+
+function handleSaveError(e: unknown) {
+  const code = e instanceof AppError ? e.code : null;
+  // 그 사이 시작했거나 취소된 신청: 알리고 변경 모드를 닫는다
+  if (
+    code === ErrorCode.VISIT_ALREADY_STARTED ||
+    code === ErrorCode.VISIT_ALREADY_CANCELED ||
+    code === ErrorCode.VISIT_NOT_FOUND
+  ) {
+    toast.error(errorMessage(e));
+    void exitEdit();
+    void refresh();
+    return;
+  }
+  // 나머지(좌석 선점·겹침·기간)는 신청과 같게 처리한다
+  handleApplyError(e);
 }
 </script>
 
@@ -309,12 +401,16 @@ function onTimeChanged(visit: Visit) {
         </RouterLink>
       </AppAlert>
 
-      <!-- 얇은 헤더: 날짜·방문 시간 -->
+      <!-- 얇은 헤더: 날짜·방문 시간 (신청한 자습실을 보기만 할 때는 내 방문 시간을 글자로) -->
       <section
+        ref="timeBar"
         aria-label="방문 시간"
-        class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl bg-surface px-4 py-3 sm:px-5"
+        class="flex min-h-16 flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl bg-surface px-4 py-3 sm:px-5"
       >
-        <p v-if="picker.noSlots.value" class="text-body text-fg-muted">
+        <p v-if="viewOnly && myVisit" class="text-label tabular-nums">
+          <span class="text-fg-muted">내 방문</span> {{ visitText(myVisit) }}
+        </p>
+        <p v-else-if="picker.noSlots.value" class="text-body text-fg-muted">
           지금 고를 수 있는 시간이 없어요. 운영 기간이 끝났거나 곧 끝나요.
         </p>
         <p v-else-if="picker.allBusy.value && !myVisit" class="text-body text-fg-muted">
@@ -339,6 +435,7 @@ function onTimeChanged(visit: Visit) {
 
       <!-- 큰 좌석 현황 -->
       <section
+        ref="seatSection"
         aria-labelledby="seat-heading"
         class="flex flex-col gap-4 rounded-xl bg-surface px-4 py-6 sm:px-8 sm:py-8"
       >
@@ -358,22 +455,22 @@ function onTimeChanged(visit: Visit) {
           class="mx-auto h-72 w-full max-w-sm rounded-lg"
         />
         <template v-else>
-          <!-- 신청한 자습실이면 내 좌석을 보여주기만 한다 (좌석은 시간 변경에서 바꾸지 않음) -->
+          <!-- 신청한 자습실을 보기만 할 때는 내 좌석을 보여주고, 변경 모드에서 다시 고른다 -->
           <SeatGrid
-            :model-value="myVisit ? (myVisit.seat?.id ?? null) : seat.seatId.value"
+            :model-value="viewOnly ? (myVisit?.seat?.id ?? null) : seat.seatId.value"
             @update:model-value="(v) => (seat.seatId.value = v)"
             :seats="seat.seats.value"
             :my-seat-id="myVisit?.seat?.id ?? null"
-            :disabled="saving || !!myVisit || !!blocked"
+            :disabled="saving || viewOnly || (!myVisit && !!blocked)"
             :aria-busy="seat.loading.value || undefined"
             :class="seat.loading.value && 'opacity-60'"
           />
           <div
-            v-if="seat.freeCount.value === 0 && !myVisit && !blocked"
+            v-if="seat.freeCount.value === 0 && !viewOnly && !(!myVisit && blocked)"
             class="mx-auto flex flex-col items-center gap-2 text-center"
           >
             <p class="text-body text-fg-muted">그 시간 내내 비어 있는 좌석이 없어요</p>
-            <AppButton variant="weak" size="sm" @click="findOtherRooms">
+            <AppButton v-if="!myVisit" variant="weak" size="sm" @click="findOtherRooms">
               같은 시간에 빈 좌석이 있는 자습실 보기
             </AppButton>
           </div>
@@ -381,7 +478,7 @@ function onTimeChanged(visit: Visit) {
       </section>
     </div>
 
-    <!-- 하단 고정: 고른 좌석·시간 + [신청하기] / 내 방문 + [시간 변경] -->
+    <!-- 하단 고정: 신청 [신청하기] / 보기 [시간 변경][좌석 변경] / 변경 모드 [취소][변경하기] -->
     <div
       v-if="room && !notFound"
       ref="actionBar"
@@ -392,7 +489,11 @@ function onTimeChanged(visit: Visit) {
         class="mx-auto flex w-full max-w-content flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6"
       >
         <p class="min-w-0 text-body tabular-nums">
-          <template v-if="myVisit">
+          <template v-if="editing">
+            <span v-if="changeText" class="font-medium">{{ changeText }}</span>
+            <span v-else class="text-fg-muted">바꿀 시간이나 좌석을 골라 주세요</span>
+          </template>
+          <template v-else-if="myVisit">
             <span class="text-label text-status-applied">내 방문</span>
             {{ visitText(myVisit)
             }}<template v-if="myVisit.seat"> · {{ myVisit.seat.number }}번 좌석</template>
@@ -404,16 +505,47 @@ function onTimeChanged(visit: Visit) {
           </template>
           <span v-else class="text-fg-muted">앉을 좌석을 골라 주세요</span>
         </p>
-        <AppButton
-          v-if="myVisit"
-          variant="secondary"
-          size="lg"
-          class="w-full sm:w-auto"
-          :disabled="!isVisitEditable(myVisit)"
-          @click="editDialog.open(myVisit.id)"
-        >
-          시간 변경
-        </AppButton>
+
+        <div v-if="editing" class="flex w-full gap-2 sm:w-auto">
+          <AppButton
+            variant="secondary"
+            size="lg"
+            class="flex-1 sm:flex-none"
+            :disabled="saving"
+            @click="exitEdit"
+          >
+            취소
+          </AppButton>
+          <AppButton
+            size="lg"
+            class="flex-1 sm:flex-none"
+            :loading="saving"
+            :disabled="!canSave"
+            @click="saveChange"
+          >
+            변경하기
+          </AppButton>
+        </div>
+        <div v-else-if="myVisit" class="flex w-full gap-2 sm:w-auto">
+          <AppButton
+            variant="secondary"
+            size="lg"
+            class="flex-1 sm:flex-none"
+            :disabled="!isVisitEditable(myVisit)"
+            @click="enterEdit('time')"
+          >
+            시간 변경
+          </AppButton>
+          <AppButton
+            variant="secondary"
+            size="lg"
+            class="flex-1 sm:flex-none"
+            :disabled="!isVisitEditable(myVisit)"
+            @click="enterEdit('seat')"
+          >
+            좌석 변경
+          </AppButton>
+        </div>
         <AppButton
           v-else
           size="lg"
@@ -428,12 +560,6 @@ function onTimeChanged(visit: Visit) {
       </div>
     </div>
 
-    <VisitTimeDialog
-      v-model:open="editOpen"
-      :visit="editingVisit"
-      @saved="onTimeChanged"
-      @stale="refresh"
-    />
     <AlternativeRoomsDialog
       v-if="full.fallback.value"
       v-model:open="full.open.value"

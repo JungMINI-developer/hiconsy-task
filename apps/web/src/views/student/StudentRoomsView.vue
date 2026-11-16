@@ -5,10 +5,8 @@ import type { StudyRoom, Visit } from '@hiconsy/shared';
 import { Check } from 'lucide-vue-next';
 import { studyRoomsApi } from '@/api/studyRooms';
 import { useAsync } from '@/composables/useAsync';
-import { useDialogQuery } from '@/composables/useDialogQuery';
-import { useHighlight, useRefetchOnVisible } from '@/composables/useRefetch';
+import { useRefetchOnVisible } from '@/composables/useRefetch';
 import { useStudentGuard } from '@/composables/useStudentGuard';
-import { useVisitToast } from '@/composables/useVisitToast';
 import { isVisitEditable, useMyVisitsStore } from '@/stores/myVisits';
 import {
   formatDate,
@@ -21,7 +19,6 @@ import { errorMessage } from '@/utils/errorMessage';
 import { hasAvailableSlot } from '@/utils/visitSlots';
 import PageShell from '@/components/layout/PageShell.vue';
 import StudyRoomCard from '@/components/domain/StudyRoomCard.vue';
-import VisitTimeDialog from '@/components/domain/VisitTimeDialog.vue';
 import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppSkeleton from '@/components/ui/AppSkeleton.vue';
@@ -31,8 +28,6 @@ import { buttonVariants } from '@/components/ui/variants';
 
 const myVisits = useMyVisitsStore();
 const handleStudentGone = useStudentGuard();
-const visitToast = useVisitToast();
-const { highlightedId, highlight } = useHighlight();
 
 // 자습실과 내 신청을 함께 가져온다 (카드에 내 신청 여부를 바로 보여주기 위해)
 const page = useAsync(async () => {
@@ -92,24 +87,6 @@ function visitText(v: Visit) {
     : formatRange(v.startAt, v.endAt);
   return v.seat ? `${time} · ${v.seat.number}번 좌석` : time;
 }
-
-// 시간 변경 (?edit=visitId) — 신청은 자습실 페이지에서 한다 (#49)
-const editDialog = useDialogQuery('edit');
-const editingVisit = computed(
-  () =>
-    myVisits.visits.find((v) => String(v.id) === editDialog.value.value && isVisitEditable(v)) ??
-    null,
-);
-const editOpen = computed({
-  get: () => !!editingVisit.value,
-  set: (v: boolean) => !v && editDialog.close(),
-});
-
-function onTimeChanged(visit: Visit) {
-  visitToast.updated(editingVisit.value, visit);
-  highlight(visit.studyRoom.id);
-  void refresh();
-}
 </script>
 
 <template>
@@ -135,7 +112,7 @@ function onTimeChanged(visit: Visit) {
       />
       <ul v-else class="grid gap-3 lg:grid-cols-2">
         <li v-for="{ room, state, myVisit } in cards" :key="room.id">
-          <StudyRoomCard :room="room" :highlighted="highlightedId === room.id">
+          <StudyRoomCard :room="room">
             <template #badges>
               <AppBadge v-if="state === 'applied'" tone="applied">
                 <Check class="size-3.5" aria-hidden="true" />
@@ -156,14 +133,14 @@ function onTimeChanged(visit: Visit) {
 
             <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
               <template v-if="state === 'applied' && myVisit">
-                <AppButton
+                <RouterLink
                   v-if="isVisitEditable(myVisit)"
-                  variant="secondary"
-                  size="sm"
-                  @click="editDialog.open(myVisit.id)"
+                  :to="{ name: 'student-room', params: { id: room.id }, query: { edit: '1' } }"
+                  :class="buttonVariants({ variant: 'secondary', size: 'sm' })"
+                  :aria-label="`${room.name} 신청 변경`"
                 >
-                  시간 변경
-                </AppButton>
+                  변경
+                </RouterLink>
                 <RouterLink
                   :to="{ name: 'student-visits' }"
                   :class="buttonVariants({ variant: 'ghost', size: 'sm' })"
@@ -202,12 +179,5 @@ function onTimeChanged(visit: Visit) {
         </li>
       </ul>
     </template>
-
-    <VisitTimeDialog
-      v-model:open="editOpen"
-      :visit="editingVisit"
-      @saved="onTimeChanged"
-      @stale="refresh"
-    />
   </PageShell>
 </template>
