@@ -18,6 +18,6 @@ export async function createTestApp(): Promise<{
 /** 테스트 간 격리를 위해 모든 도메인 테이블을 비운다 */
 export async function resetDatabase(prisma: PrismaService): Promise<void> {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE waitlist_entries, visit_histories, visits, study_rooms, students RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE visit_histories, visits, study_rooms, students RESTART IDENTITY CASCADE',
   );
 }

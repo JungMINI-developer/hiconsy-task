@@ -9,7 +9,7 @@ async function resetDatabase() {
   await client.connect();
   try {
     await client.query(
-      'TRUNCATE TABLE waitlist_entries, visit_histories, visits, study_rooms, students RESTART IDENTITY CASCADE',
+      'TRUNCATE TABLE visit_histories, visits, study_rooms, students RESTART IDENTITY CASCADE',
     );
   } finally {
     await client.end();
