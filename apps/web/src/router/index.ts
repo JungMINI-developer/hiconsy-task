@@ -54,6 +54,13 @@ export const routes: RouteRecordRaw[] = [
     meta: { role: 'student', title: '자습실 목록' },
   },
   {
+    path: '/student/rooms/:id(\\d+)',
+    name: 'student-room',
+    component: () => import('@/views/student/StudentRoomView.vue'),
+    props: (route) => ({ id: Number(route.params.id) }),
+    meta: { role: 'student', title: '자습실 좌석' },
+  },
+  {
     path: '/student/visits',
     name: 'student-visits',
     component: () => import('@/views/student/StudentVisitsView.vue'),

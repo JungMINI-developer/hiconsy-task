@@ -6,7 +6,6 @@ import { studyRoomsApi } from '@/api/studyRooms';
 import { visitsApi } from '@/api/visits';
 import { useAsync } from '@/composables/useAsync';
 import { useDialogQuery } from '@/composables/useDialogQuery';
-import { useFullRoomFallback } from '@/composables/useFullRoomFallback';
 import { useHighlight, useRefetchOnVisible } from '@/composables/useRefetch';
 import { useStudentGuard } from '@/composables/useStudentGuard';
 import { useToast } from '@/composables/useToast';
@@ -24,8 +23,7 @@ import {
 import { errorMessage } from '@/utils/errorMessage';
 import { hasAvailableSlot } from '@/utils/visitSlots';
 import PageShell from '@/components/layout/PageShell.vue';
-import AlternativeRoomsDialog from '@/components/domain/AlternativeRoomsDialog.vue';
-import VisitFormDialog, { type FullRoomEvent } from '@/components/domain/VisitFormDialog.vue';
+import VisitTimeDialog from '@/components/domain/VisitTimeDialog.vue';
 import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppSkeleton from '@/components/ui/AppSkeleton.vue';
@@ -108,42 +106,19 @@ function reapplyRoom(v: Visit): StudyRoom | null {
   return room;
 }
 
-// 다시 신청할 시간에 빈 좌석이 없으면 같은 시간에 빈 좌석이 있는 자습실 안내 (#35, #49)
-const full = useFullRoomFallback(() => page.data.value, refresh);
-
-// 시간 변경 (?edit=visitId) · 다시 신청 (?apply=roomId)
+// 시간 변경 (?edit=visitId). 다시 신청은 자습실 페이지에서 한다 (#49)
 const editDialog = useDialogQuery('edit');
-const applyDialog = useDialogQuery('apply');
 const editingVisit = computed(
   () =>
     myVisits.visits.find((v) => String(v.id) === editDialog.value.value && isVisitEditable(v)) ??
     null,
 );
-const applyingRoom = computed(() => {
-  const visit = myVisits.visits.find(
-    (v) => v.status === 'CANCELED' && String(v.studyRoom.id) === applyDialog.value.value,
-  );
-  return visit ? reapplyRoom(visit) : null;
-});
 const editOpen = computed({
   get: () => !!editingVisit.value,
   set: (v: boolean) => !v && editDialog.close(),
 });
-const applyOpen = computed({
-  get: () => !!applyingRoom.value,
-  set: (v: boolean) => !v && applyDialog.close(),
-});
-async function onFull(event: FullRoomEvent) {
-  if (await full.onFull(event)) applyDialog.close();
-}
-
-function onSaved(visit: Visit, mode: 'apply' | 'update') {
-  if (mode === 'apply') {
-    visitToast.applied(visit);
-    tab.value = 'upcoming';
-  } else {
-    visitToast.updated(editingVisit.value, visit);
-  }
+function onTimeChanged(visit: Visit) {
+  visitToast.updated(editingVisit.value, visit);
   highlight(visit.id);
   void refresh();
 }
@@ -268,40 +243,23 @@ async function confirmCancel() {
                 이미 시작한 방문은 바꾸거나 취소할 수 없어요
               </p>
             </template>
-            <AppButton
+            <RouterLink
               v-else
-              variant="weak"
-              size="sm"
-              @click="applyDialog.open(visit.studyRoom.id)"
+              :to="{ name: 'student-room', params: { id: visit.studyRoom.id } }"
+              :class="buttonVariants({ variant: 'weak', size: 'sm' })"
             >
               다시 신청
-            </AppButton>
+            </RouterLink>
           </div>
         </li>
       </ul>
     </template>
 
-    <VisitFormDialog
+    <VisitTimeDialog
       v-model:open="editOpen"
-      :room="null"
       :visit="editingVisit"
-      @saved="onSaved"
+      @saved="onTimeChanged"
       @stale="refresh"
-    />
-    <VisitFormDialog
-      v-model:open="applyOpen"
-      :room="applyingRoom"
-      @saved="onSaved"
-      @stale="refresh"
-      @full="onFull"
-    />
-    <AlternativeRoomsDialog
-      v-if="full.fallback.value"
-      v-model:open="full.open.value"
-      :full-room-name="full.fallback.value.fullRoomName"
-      :range="full.fallback.value.range"
-      :rooms="full.fallback.value.rooms"
-      @pick="full.pick"
     />
     <ConfirmDialog
       v-model:open="cancelOpen"

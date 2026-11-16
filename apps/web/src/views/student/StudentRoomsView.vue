@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
+import { RouterLink } from 'vue-router';
 import type { StudyRoom, Visit } from '@hiconsy/shared';
 import { Check } from 'lucide-vue-next';
 import { studyRoomsApi } from '@/api/studyRooms';
 import { useAsync } from '@/composables/useAsync';
 import { useDialogQuery } from '@/composables/useDialogQuery';
-import { useFullRoomFallback } from '@/composables/useFullRoomFallback';
 import { useHighlight, useRefetchOnVisible } from '@/composables/useRefetch';
 import { useStudentGuard } from '@/composables/useStudentGuard';
 import { useVisitToast } from '@/composables/useVisitToast';
@@ -19,11 +18,10 @@ import {
   formatRange,
 } from '@/utils/datetime';
 import { errorMessage } from '@/utils/errorMessage';
-import { decodeSlot, hasAvailableSlot } from '@/utils/visitSlots';
+import { hasAvailableSlot } from '@/utils/visitSlots';
 import PageShell from '@/components/layout/PageShell.vue';
 import StudyRoomCard from '@/components/domain/StudyRoomCard.vue';
-import AlternativeRoomsDialog from '@/components/domain/AlternativeRoomsDialog.vue';
-import VisitFormDialog, { type FullRoomEvent } from '@/components/domain/VisitFormDialog.vue';
+import VisitTimeDialog from '@/components/domain/VisitTimeDialog.vue';
 import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppSkeleton from '@/components/ui/AppSkeleton.vue';
@@ -95,39 +93,20 @@ function visitText(v: Visit) {
   return v.seat ? `${time} · ${v.seat.number}번 좌석` : time;
 }
 
-// 신청 (?apply=roomId, 미리 고른 시간 &slot=) · 시간 변경 (?edit=visitId)
-const route = useRoute();
-const applyDialog = useDialogQuery('apply', { clear: ['slot'] });
-const initialSlot = computed(() => decodeSlot(route.query.slot));
-// 고른 시간에 빈 좌석이 없으면 같은 시간에 빈 좌석이 있는 자습실 안내 (#35, #49)
-const full = useFullRoomFallback(() => page.data.value, refresh);
-async function onFull(event: FullRoomEvent) {
-  if (await full.onFull(event)) applyDialog.close();
-}
+// 시간 변경 (?edit=visitId) — 신청은 자습실 페이지에서 한다 (#49)
 const editDialog = useDialogQuery('edit');
-const applyingCard = computed(
-  () =>
-    cards.value.find(
-      (c) => String(c.room.id) === applyDialog.value.value && c.state === 'available',
-    ) ?? null,
-);
 const editingVisit = computed(
   () =>
     myVisits.visits.find((v) => String(v.id) === editDialog.value.value && isVisitEditable(v)) ??
     null,
 );
-const applyOpen = computed({
-  get: () => !!applyingCard.value,
-  set: (v: boolean) => !v && applyDialog.close(),
-});
 const editOpen = computed({
   get: () => !!editingVisit.value,
   set: (v: boolean) => !v && editDialog.close(),
 });
 
-function onSaved(visit: Visit, mode: 'apply' | 'update') {
-  if (mode === 'apply') visitToast.applied(visit);
-  else visitToast.updated(editingVisit.value, visit);
+function onTimeChanged(visit: Visit) {
+  visitToast.updated(editingVisit.value, visit);
   highlight(visit.studyRoom.id);
   void refresh();
 }
@@ -200,12 +179,20 @@ function onSaved(visit: Visit, mode: 'apply' | 'update') {
                 >
                   {{ REASON[state] }}
                 </span>
+                <RouterLink
+                  v-if="state === 'available'"
+                  :to="{ name: 'student-room', params: { id: room.id } }"
+                  :class="buttonVariants({ variant: 'weak', size: 'sm' })"
+                  :aria-label="`${room.name} 방문 신청`"
+                >
+                  방문 신청
+                </RouterLink>
                 <AppButton
+                  v-else
                   variant="weak"
                   size="sm"
-                  :disabled="state !== 'available'"
-                  :aria-describedby="state !== 'available' ? `reason-${room.id}` : undefined"
-                  @click="applyDialog.open(room.id)"
+                  disabled
+                  :aria-describedby="`reason-${room.id}`"
                 >
                   방문 신청
                 </AppButton>
@@ -216,28 +203,11 @@ function onSaved(visit: Visit, mode: 'apply' | 'update') {
       </ul>
     </template>
 
-    <VisitFormDialog
-      v-model:open="applyOpen"
-      :room="applyingCard?.room ?? null"
-      :initial-slot="initialSlot"
-      @saved="onSaved"
-      @stale="refresh"
-      @full="onFull"
-    />
-    <VisitFormDialog
+    <VisitTimeDialog
       v-model:open="editOpen"
-      :room="null"
       :visit="editingVisit"
-      @saved="onSaved"
+      @saved="onTimeChanged"
       @stale="refresh"
-    />
-    <AlternativeRoomsDialog
-      v-if="full.fallback.value"
-      v-model:open="full.open.value"
-      :full-room-name="full.fallback.value.fullRoomName"
-      :range="full.fallback.value.range"
-      :rooms="full.fallback.value.rooms"
-      @pick="full.pick"
     />
   </PageShell>
 </template>
