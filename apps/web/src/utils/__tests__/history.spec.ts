@@ -19,6 +19,8 @@ function h(
     prevEndAt: null,
     startAt,
     endAt: '2026-11-20T20:00:00+09:00',
+    prevSeat: null,
+    seat: null,
     actorType: 'STUDENT',
     reason: null,
     createdAt,

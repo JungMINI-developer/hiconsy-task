@@ -1,13 +1,13 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ErrorCode, type Visit } from '@hiconsy/shared';
 import { DomainException } from '../common/exceptions/domain.exception.js';
-import type { Prisma, StudyRoom, Visit as VisitRow } from '../generated/prisma/client.js';
+import type { Prisma, Seat, StudyRoom, Visit as VisitRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { lockStudent, studentNotFound, type StudentLockMode } from '../students/student-lock.js';
 import { lockStudyRoom } from '../study-rooms/study-room-lock.js';
 import type { CreateVisitDto } from './dto/create-visit.dto.js';
 import type { UpdateVisitDto } from './dto/update-visit.dto.js';
-import { toVisit } from './visit.mapper.js';
+import { toVisit, visitInclude } from './visit.mapper.js';
 import { assertValidVisitTime } from './visit-time.js';
 
 /**
@@ -29,7 +29,7 @@ export class VisitsService {
     if (exists === 0) throw studentNotFound();
     const visits = await this.prisma.visit.findMany({
       where: { studentId },
-      include: { studyRoom: true },
+      include: visitInclude,
       orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
     });
     return visits.map(toVisit);
@@ -76,11 +76,11 @@ export class VisitsService {
         ? await tx.visit.update({
             where: { id: existing.id },
             data: { status: 'APPLIED', startAt, endAt, canceledAt: null },
-            include: { studyRoom: true },
+            include: visitInclude,
           })
         : await tx.visit.create({
             data: { studentId, studyRoomId: room.id, startAt, endAt },
-            include: { studyRoom: true },
+            include: visitInclude,
           });
 
       await tx.visitHistory.create({
@@ -117,7 +117,7 @@ export class VisitsService {
       const updated = await tx.visit.update({
         where: { id: visit.id },
         data: { startAt, endAt },
-        include: { studyRoom: true },
+        include: visitInclude,
       });
       await tx.visitHistory.create({
         data: {
@@ -146,7 +146,7 @@ export class VisitsService {
       const canceled = await tx.visit.update({
         where: { id: visit.id },
         data: { status: 'CANCELED', canceledAt: new Date() },
-        include: { studyRoom: true },
+        include: visitInclude,
       });
       await tx.visitHistory.create({
         data: {
@@ -174,13 +174,16 @@ export class VisitsService {
     studentId: number,
     visitId: number,
     studentLock: StudentLockMode,
-  ): Promise<{ visit: VisitRow; room: StudyRoom }> {
+  ): Promise<{ visit: VisitRow & { seat: Seat | null }; room: StudyRoom }> {
     await lockStudent(tx, studentId, studentLock);
     const target = await tx.visit.findFirst({ where: { id: visitId, studentId } });
     if (!target) throw visitNotFound();
 
     await lockStudyRoom(tx, target.studyRoomId);
-    const visit = await tx.visit.findUniqueOrThrow({ where: { id: visitId } });
+    const visit = await tx.visit.findUniqueOrThrow({
+      where: { id: visitId },
+      include: { seat: true },
+    });
     const room = await tx.studyRoom.findUniqueOrThrow({ where: { id: visit.studyRoomId } });
     return { visit, room };
   }

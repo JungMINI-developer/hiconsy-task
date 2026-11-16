@@ -34,6 +34,7 @@ function visit(roomId: number, start: string, end: string, status: Visit['status
     },
     startAt: at(start).toISOString(),
     endAt: at(end).toISOString(),
+    seat: null,
     status,
     canceledAt: null,
     createdAt: '2026-11-01T00:00:00+09:00',
