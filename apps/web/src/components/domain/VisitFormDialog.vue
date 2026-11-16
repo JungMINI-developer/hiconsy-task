@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
-import { ErrorCode, type Visit } from '@hiconsy/shared';
+import { ErrorCode, type SeatAvailability, type Visit } from '@hiconsy/shared';
+import { studyRoomsApi } from '@/api/studyRooms';
 import { visitsApi } from '@/api/visits';
 import { AppError } from '@/api/client';
 import { useStudentGuard } from '@/composables/useStudentGuard';
@@ -34,7 +35,9 @@ import AppAlert from '@/components/ui/AppAlert.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppDialog from '@/components/ui/AppDialog.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import AppSkeleton from '@/components/ui/AppSkeleton.vue';
 import FormField from '@/components/ui/FormField.vue';
+import SeatGrid from './SeatGrid.vue';
 
 export interface VisitRoom extends Period {
   id: number;
@@ -42,9 +45,10 @@ export interface VisitRoom extends Period {
 }
 
 /**
- * S-22 방문 신청·시간 변경 다이얼로그.
+ * S-22 방문 신청·시간 변경 다이얼로그 — 한 화면에서 시간과 좌석을 고른다 (#49).
  * 운영 기간 밖·지난 시각은 선택지에서 아예 제외하고,
  * 내 다른 신청과 겹치는 시각은 이유와 함께 비활성화한다 (interaction-rules.md#방문-s-22).
+ * 좌석은 고른 시간 내내 비어 있는 좌석만 고를 수 있고, 시간을 바꿀 때마다 배치도를 다시 받는다.
  */
 const open = defineModel<boolean>('open', { required: true });
 
@@ -52,13 +56,11 @@ const props = defineProps<{
   room: VisitRoom | null;
   /** 있으면 시간 변경 모드 */
   visit?: Visit | null;
-  /** 신청 모드에서 보여줄 남은 자리 */
-  remaining?: number;
   /** 신청 모드에서 미리 고를 시간 (고를 수 없는 값이면 무시하고 기본값) */
   initialSlot?: SlotValue | null;
 }>();
 
-/** 정원이 차서 신청이 거절됨 — 거절된 자습실과 고른 시간 */
+/** 고른 시간에 빈 좌석이 없어 같은 시간의 다른 자습실을 찾음 (S-23) */
 export interface FullRoomEvent {
   room: VisitRoom;
   startAt: Date;
@@ -71,6 +73,7 @@ const emit = defineEmits<{
   saved: [visit: Visit, mode: 'apply' | 'update'];
   /** 정원·기간이 바뀌어 목록을 다시 가져와야 함 */
   stale: [];
+  /** [같은 시간에 빈 좌석이 있는 자습실 보기] — 다이얼로그는 화면이 닫는다 (후보가 있을 때만) */
   full: [event: FullRoomEvent];
 }>();
 
@@ -232,22 +235,138 @@ const conflict = computed(() =>
     : undefined,
 );
 
+// ── 좌석 (#49) ──────────────────────────────────────────────
+
+const roomId = computed(() => props.visit?.studyRoom.id ?? props.room?.id ?? null);
+const seats = ref<SeatAvailability[]>([]);
+const seatId = ref<number | null>(null);
+const seatsLoading = ref(false);
+const seatsError = ref<string | null>(null);
+/** 다이얼로그를 연 뒤 첫 좌석 응답을 받았는지 (그 전엔 스켈레톤) */
+const seatsLoaded = ref(false);
+/** 연 직후 첫 조회면 좌석을 미리 골라 둔다 */
+let pickDefaultSeat = false;
+/** 늦게 온 응답 버리기 */
+let seatRequest = 0;
+
+const freeSeatCount = computed(() => seats.value.filter((s) => s.available).length);
+const selectedSeat = computed(() => seats.value.find((s) => s.id === seatId.value) ?? null);
+const mySeatId = computed(() => props.visit?.seat?.id ?? null);
+
+/** 미리 고를 좌석: 시간 변경이면 지금 좌석, 재신청이면 이전 좌석 */
+const preferredSeatId = computed(() => {
+  if (props.visit) return props.visit.seat?.id ?? null;
+  const previous = myVisits.visits.find(
+    (v) => v.status === 'CANCELED' && v.studyRoom.id === props.room?.id,
+  );
+  return previous?.seat?.id ?? null;
+});
+
+/**
+ * 고른 시간의 좌석을 다시 받는다.
+ * - 연 직후: 미리 고를 좌석이 비어 있으면 그 좌석, 아니면 가장 작은 번호의 빈 좌석
+ * - 시간을 바꾼 뒤: 고른 좌석이 그 시간에 차 있으면 선택을 풀고 알린다
+ */
+async function loadSeats(reason: 'time' | 'refresh' = 'time') {
+  const id = roomId.value;
+  const range = selected.value;
+  const request = ++seatRequest;
+  if (!open.value || id === null || !range) {
+    seats.value = [];
+    seatsLoading.value = false;
+    return;
+  }
+  seatsLoading.value = true;
+  seatsError.value = null;
+  try {
+    const list = await studyRoomsApi.seats(
+      id,
+      { startAt: toIsoWithOffset(range.startAt), endAt: toIsoWithOffset(range.endAt) },
+      props.visit?.id,
+    );
+    if (request !== seatRequest) return;
+    seats.value = list;
+    seatsLoaded.value = true;
+    const isFree = (sid: number | null) => list.some((s) => s.id === sid && s.available);
+    if (pickDefaultSeat) {
+      pickDefaultSeat = false;
+      seatId.value = isFree(preferredSeatId.value)
+        ? preferredSeatId.value
+        : (list.find((s) => s.available)?.id ?? null);
+    } else if (seatId.value !== null && !isFree(seatId.value)) {
+      seatId.value = null;
+      if (reason === 'time') {
+        toast.error('그 시간에는 다른 학생이 이미 예약한 좌석이에요. 다른 좌석을 골라 주세요');
+      }
+    }
+  } catch (e) {
+    if (request !== seatRequest) return;
+    if (handleStudentGone(e)) {
+      open.value = false;
+      return;
+    }
+    seatsError.value = errorMessage(e);
+  } finally {
+    if (request === seatRequest) seatsLoading.value = false;
+  }
+}
+
+// 열리거나 자습실·시간이 바뀌면 좌석을 다시 받는다
+watch(
+  [open, roomId, () => selected.value?.startAt.getTime(), () => selected.value?.endAt.getTime()],
+  ([isOpen], previous) => {
+    const [wasOpen, prevRoomId] = previous ?? [false, null];
+    if (!isOpen) {
+      seats.value = [];
+      seatId.value = null;
+      seatsLoaded.value = false;
+      return;
+    }
+    if (!wasOpen || prevRoomId !== roomId.value) {
+      pickDefaultSeat = true;
+      seatsLoaded.value = false;
+    }
+    void loadSeats('time');
+  },
+  { immediate: true },
+);
+
+/** [같은 시간에 빈 좌석이 있는 자습실 보기] (S-23) */
+function findOtherRooms() {
+  if (!props.room || !selected.value) return;
+  emit('full', {
+    room: props.room,
+    ...selected.value,
+    message: '같은 시간에 빈 좌석이 있는 자습실이 없어요',
+  });
+}
+
 const unchanged = computed(
   () =>
     !!props.visit &&
     !!selected.value &&
     selected.value.startAt.getTime() === new Date(props.visit.startAt).getTime() &&
-    selected.value.endAt.getTime() === new Date(props.visit.endAt).getTime(),
+    selected.value.endAt.getTime() === new Date(props.visit.endAt).getTime() &&
+    seatId.value === (props.visit.seat?.id ?? null),
 );
 
 async function submit() {
   const studentId = session.studentId;
-  if (!selected.value || studentId === null || unchanged.value || conflict.value) return;
+  if (
+    !selected.value ||
+    seatId.value === null ||
+    studentId === null ||
+    unchanged.value ||
+    conflict.value
+  ) {
+    return;
+  }
   formError.value = null;
   saving.value = true;
   const body = {
     startAt: toIsoWithOffset(selected.value.startAt),
     endAt: toIsoWithOffset(selected.value.endAt),
+    seatId: seatId.value,
   };
   try {
     const saved = props.visit
@@ -268,15 +387,23 @@ function handleError(e: unknown) {
     return;
   }
   const code = e instanceof AppError ? e.code : null;
-  // 정원 마감: 닫고, 같은 시간에 자리가 남은 다른 자습실 안내는 화면이 맡는다 (#35)
-  if (code === ErrorCode.CAPACITY_FULL && !isEdit.value && props.room && selected.value) {
-    emit('full', { room: props.room, ...selected.value, message: errorMessage(e) });
-    open.value = false;
-    return;
-  }
   switch (code) {
+    // 고른 좌석을 그 사이 다른 학생이 가져갔거나 쓸 수 없게 됨: 다이얼로그를 두고 배치도를 다시 받는다
+    case ErrorCode.SEAT_TAKEN:
+    case ErrorCode.SEAT_NOT_FOUND:
+    case ErrorCode.CAPACITY_FULL: {
+      const number = selectedSeat.value?.number;
+      toast.error(
+        code === ErrorCode.SEAT_TAKEN && number !== undefined
+          ? `방금 다른 학생이 ${number}번 좌석을 예약했어요. 다른 좌석을 골라 주세요`
+          : errorMessage(e),
+      );
+      seatId.value = null;
+      void loadSeats('refresh');
+      emit('stale');
+      return;
+    }
     // 목록 기준이 바뀐 경우: 알리고 닫은 뒤 다시 조회
-    case ErrorCode.CAPACITY_FULL:
     case ErrorCode.STUDY_ROOM_NOT_FOUND:
     case ErrorCode.VISIT_ALREADY_CANCELED:
     case ErrorCode.VISIT_ALREADY_STARTED:
@@ -388,16 +515,67 @@ function handleError(e: unknown) {
           </p>
         </fieldset>
 
-        <p v-if="!isEdit && remaining !== undefined" class="text-body">
-          남은 자리 <span class="font-medium tabular-nums">{{ remaining }}</span>
-        </p>
-        <p v-if="isEdit && visit" class="text-caption text-fg-muted">
+        <p v-if="isEdit && visit" class="-mt-2 text-caption text-fg-muted">
           지금 신청한 시간: {{ formatDate(visit.startAt) }}
-          {{ formatTimeRange(visit.startAt, visit.endAt) }}
+          {{ formatTimeRange(visit.startAt, visit.endAt)
+          }}<template v-if="visit.seat"> · {{ visit.seat.number }}번 좌석</template>
         </p>
+
+        <!-- 좌석 (#49): 고른 시간 내내 비어 있는 좌석만 고를 수 있다 -->
+        <section
+          aria-labelledby="visit-seat-heading"
+          class="flex flex-col gap-3 border-t border-line pt-5"
+        >
+          <div class="flex items-baseline justify-between gap-3">
+            <h3 id="visit-seat-heading" class="text-label">좌석</h3>
+            <p
+              v-if="seatsLoaded && !seatsError"
+              class="text-caption text-fg-muted tabular-nums"
+              aria-live="polite"
+            >
+              이 시간 빈 좌석 {{ freeSeatCount }}석
+            </p>
+          </div>
+
+          <div v-if="seatsError" class="flex flex-col items-start gap-2" role="alert">
+            <p class="text-caption text-status-danger">
+              좌석을 불러오지 못했어요. {{ seatsError }}
+            </p>
+            <AppButton variant="secondary" size="sm" @click="loadSeats('refresh')">
+              다시 시도
+            </AppButton>
+          </div>
+          <AppSkeleton v-else-if="!seatsLoaded" class="h-48 w-full rounded-lg" />
+          <template v-else>
+            <SeatGrid
+              v-model="seatId"
+              :seats="seats"
+              :my-seat-id="mySeatId"
+              :disabled="saving"
+              :aria-busy="seatsLoading || undefined"
+              :class="seatsLoading && 'opacity-60'"
+            />
+            <div
+              v-if="freeSeatCount === 0"
+              class="flex flex-col items-start gap-2 rounded-lg bg-grey-50 px-4 py-3"
+            >
+              <p class="text-body text-fg-muted">그 시간 내내 비어 있는 좌석이 없어요</p>
+              <AppButton v-if="!isEdit && room" variant="weak" size="sm" @click="findOtherRooms">
+                같은 시간에 빈 좌석이 있는 자습실 보기
+              </AppButton>
+            </div>
+            <p v-else-if="selectedSeat" class="text-body">
+              <span class="font-medium tabular-nums">{{ selectedSeat.number }}번 좌석</span>에
+              앉아요
+            </p>
+            <p v-else class="text-caption text-fg-muted">앉을 좌석을 골라 주세요</p>
+          </template>
+        </section>
       </template>
 
-      <p v-if="unchanged" class="-mb-2 text-caption text-fg-muted">바꿀 시간을 골라 주세요</p>
+      <p v-if="unchanged" class="-mb-2 text-caption text-fg-muted">
+        바꿀 시간이나 좌석을 골라 주세요
+      </p>
       <div class="mt-2 flex gap-2">
         <AppButton variant="secondary" size="lg" class="flex-1" @click="open = false"
           >닫기</AppButton
@@ -408,7 +586,7 @@ function handleError(e: unknown) {
           size="lg"
           class="flex-1"
           :loading="saving"
-          :disabled="!selected || unchanged || !!conflict"
+          :disabled="!selected || seatId === null || seatsLoading || unchanged || !!conflict"
         >
           {{ isEdit ? '변경하기' : '신청하기' }}
         </AppButton>
