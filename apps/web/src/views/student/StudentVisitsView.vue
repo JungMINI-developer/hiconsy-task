@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { RouterLink } from 'vue-router';
-import type { StudyRoom, Visit } from '@hiconsy/shared';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
+import type { StudyRoom, Visit, WaitlistEntry, WaitlistStatus } from '@hiconsy/shared';
 import { studyRoomsApi } from '@/api/studyRooms';
 import { visitsApi } from '@/api/visits';
+import { waitlistApi } from '@/api/waitlist';
 import { useAsync } from '@/composables/useAsync';
 import { useDialogQuery } from '@/composables/useDialogQuery';
 import { useFullRoomFallback } from '@/composables/useFullRoomFallback';
@@ -12,19 +13,22 @@ import { useStudentGuard } from '@/composables/useStudentGuard';
 import { useToast } from '@/composables/useToast';
 import { useVisitToast } from '@/composables/useVisitToast';
 import { isVisitEditable, useMyVisitsStore, visitGroup, type VisitGroup } from '@/stores/myVisits';
+import { isActiveWait, useMyWaitlistStore } from '@/stores/myWaitlist';
 import { useSessionStore } from '@/stores/session';
 import { cn } from '@/utils/cn';
 import {
   formatDate,
   formatRange,
+  formatTime,
   formatTimeRange,
   getRoomPhase,
   isSameDay,
 } from '@/utils/datetime';
 import { errorMessage } from '@/utils/errorMessage';
-import { hasAvailableSlot } from '@/utils/visitSlots';
+import { encodeSlot, hasAvailableSlot } from '@/utils/visitSlots';
 import PageShell from '@/components/layout/PageShell.vue';
 import AlternativeRoomsDialog from '@/components/domain/AlternativeRoomsDialog.vue';
+import OfferBanner from '@/components/domain/OfferBanner.vue';
 import VisitFormDialog from '@/components/domain/VisitFormDialog.vue';
 import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
@@ -37,15 +41,19 @@ import { buttonVariants } from '@/components/ui/variants';
 
 const session = useSessionStore();
 const myVisits = useMyVisitsStore();
+const myWaitlist = useMyWaitlistStore();
+const route = useRoute();
+const router = useRouter();
 const toast = useToast();
 const visitToast = useVisitToast();
 const handleStudentGone = useStudentGuard();
 const { highlightedId, highlight } = useHighlight();
 
-// 다시 신청 가능 여부를 알기 위해 자습실 목록도 함께 가져온다
+// 다시 신청 가능 여부를 알기 위해 자습실 목록도 함께 가져온다.
+// 내 대기 조회가 서버의 제안 정리(만료·다음 순번)를 일으키므로 자습실 목록보다 먼저 받는다.
 const page = useAsync(async () => {
-  const [rooms] = await Promise.all([studyRoomsApi.list(), myVisits.load()]);
-  return rooms;
+  await Promise.all([myVisits.load(), myWaitlist.load()]);
+  return studyRoomsApi.list();
 });
 async function refresh() {
   await page.run();
@@ -53,7 +61,9 @@ async function refresh() {
 }
 useRefetchOnVisible(refresh);
 
-const tab = ref<VisitGroup>('upcoming');
+type Tab = VisitGroup | 'waitlist';
+// 자습실 카드의 [내 대기 보기]는 ?tab=waitlist로 들어온다
+const tab = ref<Tab>(route.query.tab === 'waitlist' ? 'waitlist' : 'upcoming');
 
 const groups = computed(() => {
   const now = new Date();
@@ -75,6 +85,11 @@ const tabs = computed(() => {
       label: '예정',
       count: loaded ? groups.value.upcoming.length : undefined,
     },
+    {
+      value: 'waitlist' as const,
+      label: '대기',
+      count: loaded ? myWaitlist.active.length : undefined,
+    },
     { value: 'past' as const, label: '지난 방문' },
     {
       value: 'canceled' as const,
@@ -83,10 +98,74 @@ const tabs = computed(() => {
     },
   ];
 });
-const visible = computed(() => groups.value[tab.value]);
+const visible = computed(() => (tab.value === 'waitlist' ? [] : groups.value[tab.value]));
 
-const EMPTY: Record<VisitGroup, string> = {
+/** 대기 탭 (#36): 진행 중(제안 → 대기 순) 위, 끝난 대기(최근 순) 아래 */
+const waits = computed(() => {
+  const time = (s: string | null) => (s ? new Date(s).getTime() : 0);
+  const active = myWaitlist.active
+    .slice()
+    .sort(
+      (a, b) =>
+        Number(b.status === 'OFFERED') - Number(a.status === 'OFFERED') ||
+        time(a.createdAt) - time(b.createdAt),
+    );
+  const ended = myWaitlist.entries
+    .filter((e) => !isActiveWait(e))
+    .sort((a, b) => time(b.endedAt) - time(a.endedAt));
+  return [...active, ...ended];
+});
+
+const WAIT_BADGE: Record<
+  WaitlistStatus,
+  { label: string; tone: 'applied' | 'neutral' | 'open' | 'canceled' }
+> = {
+  OFFERED: { label: '자리 제안', tone: 'applied' },
+  WAITING: { label: '대기 중', tone: 'neutral' },
+  CONFIRMED: { label: '확정', tone: 'open' },
+  DECLINED: { label: '거절함', tone: 'canceled' },
+  EXPIRED: { label: '만료', tone: 'canceled' },
+  CANCELED: { label: '취소됨', tone: 'canceled' },
+};
+
+function confirmOffer(wait: WaitlistEntry) {
+  void router.push({
+    name: 'student-rooms',
+    query: {
+      apply: String(wait.studyRoom.id),
+      slot: encodeSlot(new Date(wait.startAt), new Date(wait.endAt)),
+    },
+  });
+}
+
+// 대기 취소 · 자리 제안 거절
+const endingWait = ref<WaitlistEntry | null>(null);
+const endWaitBusy = ref(false);
+const endWaitOpen = computed({
+  get: () => !!endingWait.value,
+  set: (v: boolean) => !v && (endingWait.value = null),
+});
+
+async function confirmEndWait() {
+  const wait = endingWait.value;
+  const studentId = session.studentId;
+  if (!wait || studentId === null) return;
+  endWaitBusy.value = true;
+  try {
+    await waitlistApi.cancel(studentId, wait.id);
+    toast.success(wait.status === 'OFFERED' ? '자리 제안을 거절했어요' : '대기를 취소했어요');
+  } catch (e) {
+    if (!handleStudentGone(e)) toast.error(errorMessage(e));
+  } finally {
+    endWaitBusy.value = false;
+    endingWait.value = null;
+    void refresh();
+  }
+}
+
+const EMPTY: Record<Tab, string> = {
   upcoming: '아직 신청한 방문이 없어요',
+  waitlist: '대기 중인 자습실이 없어요',
   past: '지난 방문이 없어요',
   canceled: '취소한 방문이 없어요',
 };
@@ -104,7 +183,7 @@ function reapplyRoom(v: Visit): StudyRoom | null {
   if (v.studyRoom.deleted || myVisits.activeByRoom.has(v.studyRoom.id)) return null;
   const room = page.data.value?.find((r) => r.id === v.studyRoom.id);
   if (!room || getRoomPhase(room) === 'ended') return null;
-  if (room.currentPersonnel >= room.maxPersonnel || !hasAvailableSlot(room)) return null;
+  if (room.availableSeats === 0 || !hasAvailableSlot(room)) return null;
   return room;
 }
 
@@ -178,10 +257,13 @@ async function confirmCancel() {
 
 <template>
   <PageShell title="내 신청">
+    <OfferBanner @changed="refresh" />
     <AppTabs v-model="tab" :items="tabs" label="신청 상태" class="mb-5" />
 
     <p class="sr-only" aria-live="polite">
-      <template v-if="page.status.value === 'success'">신청 {{ visible.length }}건</template>
+      <template v-if="page.status.value === 'success'">
+        {{ tab === 'waitlist' ? `대기 ${waits.length}건` : `신청 ${visible.length}건` }}
+      </template>
     </p>
 
     <div v-if="page.showSkeleton.value" class="flex flex-col gap-3">
@@ -193,6 +275,62 @@ async function confirmCancel() {
       :description="errorMessage(page.error.value)"
       @retry="refresh"
     />
+    <template v-else-if="page.data.value && tab === 'waitlist'">
+      <EmptyState
+        v-if="waits.length === 0"
+        :title="EMPTY.waitlist"
+        description="정원이 찬 자습실에 대기 등록하면 자리가 났을 때 여기서 확정할 수 있어요"
+      />
+      <ul v-else class="flex flex-col gap-3">
+        <li
+          v-for="wait in waits"
+          :key="wait.id"
+          class="flex flex-col gap-3 rounded-xl bg-surface p-4 sm:p-5"
+          data-testid="wait"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h2 class="text-label text-fg-muted">{{ wait.studyRoom.name }}</h2>
+              <p
+                :class="
+                  cn('mt-0.5 text-heading tabular-nums', !isActiveWait(wait) && 'text-fg-muted')
+                "
+              >
+                <span class="sr-only">원하는 시간 </span>{{ visitText(wait) }}
+              </p>
+            </div>
+            <AppBadge :tone="WAIT_BADGE[wait.status].tone">
+              {{
+                wait.status === 'WAITING' && wait.position
+                  ? `대기 ${wait.position}번째`
+                  : WAIT_BADGE[wait.status].label
+              }}
+            </AppBadge>
+          </div>
+
+          <p class="text-caption text-fg-muted tabular-nums">
+            대기 등록 {{ formatDate(wait.createdAt) }}
+            <template v-if="wait.status === 'OFFERED' && wait.offerExpiresAt">
+              · {{ formatTime(wait.offerExpiresAt) }}까지 확정해 주세요
+            </template>
+            <template v-else-if="wait.status === 'WAITING'">
+              · 자리가 나면 순번대로 10분 동안 자리를 잡아 드려요
+            </template>
+            <template v-else-if="wait.endReason"> · {{ wait.endReason }}</template>
+          </p>
+
+          <div v-if="isActiveWait(wait)" class="flex flex-wrap items-center justify-end gap-2">
+            <template v-if="wait.status === 'OFFERED'">
+              <AppButton variant="secondary" size="sm" @click="endingWait = wait">거절</AppButton>
+              <AppButton size="sm" @click="confirmOffer(wait)">확정하기</AppButton>
+            </template>
+            <AppButton v-else variant="danger-weak" size="sm" @click="endingWait = wait">
+              대기 취소
+            </AppButton>
+          </div>
+        </li>
+      </ul>
+    </template>
     <template v-else-if="page.data.value">
       <EmptyState v-if="visible.length === 0" :title="EMPTY[tab]">
         <RouterLink
@@ -287,9 +425,7 @@ async function confirmCancel() {
     <VisitFormDialog
       v-model:open="applyOpen"
       :room="applyingRoom"
-      :remaining="
-        applyingRoom ? applyingRoom.maxPersonnel - applyingRoom.currentPersonnel : undefined
-      "
+      :remaining="applyingRoom?.availableSeats"
       @saved="onSaved"
       @stale="refresh"
       @full="full.onFull"
@@ -297,10 +433,14 @@ async function confirmCancel() {
     <AlternativeRoomsDialog
       v-if="full.fallback.value"
       v-model:open="full.open.value"
-      :full-room-name="full.fallback.value.fullRoomName"
+      :full-room-name="full.fallback.value.fullRoom.name"
       :range="full.fallback.value.range"
       :rooms="full.fallback.value.rooms"
+      :can-wait="full.fallback.value.canWait"
+      :waiting-count="full.fallback.value.waitingCount"
+      :waiting="full.waiting.value"
       @pick="full.pick"
+      @wait="full.wait"
     />
     <ConfirmDialog
       v-model:open="cancelOpen"
@@ -309,6 +449,22 @@ async function confirmCancel() {
       confirm-label="방문 취소"
       :loading="cancelBusy"
       @confirm="confirmCancel"
+    />
+    <ConfirmDialog
+      v-model:open="endWaitOpen"
+      :title="endingWait?.status === 'OFFERED' ? '자리 제안을 거절할까요?' : '대기를 취소할까요?'"
+      :description="
+        endingWait
+          ? `${endingWait.studyRoom.name} · ${visitText(endingWait)}. ${
+              endingWait.status === 'OFFERED'
+                ? '자리는 다음 대기자에게 넘어가요.'
+                : '순번이 사라지고, 다시 대기하면 맨 뒤로 가요.'
+            }`
+          : ''
+      "
+      :confirm-label="endingWait?.status === 'OFFERED' ? '제안 거절' : '대기 취소'"
+      :loading="endWaitBusy"
+      @confirm="confirmEndWait"
     />
   </PageShell>
 </template>

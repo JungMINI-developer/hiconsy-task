@@ -192,7 +192,16 @@ const menuItems = [
                 @select="(key) => onMenu(room, key)"
               />
             </template>
-            <CapacityBar :current="room.currentPersonnel" :max="room.maxPersonnel" />
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <CapacityBar :current="room.currentPersonnel" :max="room.maxPersonnel" />
+              <!-- 수요를 보고 정원을 늘릴지 판단할 수 있게 대기 인원을 함께 보여준다 (#36) -->
+              <span
+                v-if="room.waitingCount + room.offeredCount"
+                class="text-label text-fg-muted tabular-nums"
+              >
+                대기 {{ room.waitingCount + room.offeredCount }}명
+              </span>
+            </div>
           </StudyRoomCard>
         </li>
       </ul>
