@@ -1,6 +1,6 @@
 import { test as base, expect, type APIRequestContext, type Page } from '@playwright/test';
 import pg from 'pg';
-import type { ApiResponse, Student, StudyRoom, Visit, WaitlistEntry } from '@hiconsy/shared';
+import type { ApiResponse, Student, StudyRoom, Visit } from '@hiconsy/shared';
 import { E2E_API_URL, E2E_DATABASE_URL } from './env';
 
 /** 테스트 사이 격리: 모든 도메인 테이블을 비운다 (API e2e의 resetDatabase와 같은 방식) */
@@ -65,15 +65,6 @@ export class Seed {
 
   cancelVisit(studentId: number, visitId: number) {
     return this.post<Visit>(`/students/${studentId}/visits/${visitId}/cancel`, {});
-  }
-
-  /** 대기 등록 (#36) — 정원이 찬 자습실에만 된다 */
-  wait(studentId: number, studyRoomId: number, startAt: string, endAt: string) {
-    return this.post<WaitlistEntry>(`/students/${studentId}/waitlist`, {
-      studyRoomId,
-      startAt,
-      endAt,
-    });
   }
 
   async deleteRoom(id: number) {
