@@ -6,21 +6,18 @@ import type { Locator, Page } from '@playwright/test';
 
 test.describe('토스트', () => {
   test('화면 가운데 아래에 뜨고, 연달아 오면 모두 보인다', async ({ page, seed }) => {
-    await seed.room({ name: 'A 자습실' });
-    await seed.room({ name: 'B 자습실' });
+    const room = await seed.room({ name: 'A 자습실' });
     const me = await seed.student('김하늘', '010-1111-1111');
     await enterAsStudent(page, me);
-    await page.goto('/student/rooms');
+    await page.goto(`/student/rooms/${room.id}`);
 
-    for (const name of ['A 자습실', 'B 자습실']) {
-      await page
-        .getByRole('listitem')
-        .filter({ hasText: name })
-        .getByRole('button', { name: '방문 신청' })
-        .click();
-      await page.getByRole('dialog').getByRole('button', { name: '신청하기' }).click();
-      await expect(page.getByRole('dialog')).toBeHidden();
-    }
+    // 한 페이지에서 연달아: 신청 → 시간 변경 (토스트는 4초 동안 남는다)
+    await page.getByRole('button', { name: '신청하기' }).click();
+    await page.getByRole('button', { name: '시간 변경' }).click();
+    const edit = page.getByRole('dialog', { name: 'A 자습실 시간 변경' });
+    await pick(page, edit.getByRole('combobox', { name: '방문 시작 시각' }), '11:00');
+    await edit.getByRole('button', { name: '변경하기' }).click();
+    await expect(edit).toBeHidden();
 
     const items = page.getByRole('region', { name: /알림/ }).getByRole('listitem');
     await expect(items).toHaveCount(2);
@@ -136,21 +133,21 @@ test.describe('학생 · 표기', () => {
     await expect(card).toContainText('내일 10:00 – 22:00');
   });
 
-  test('신청 다이얼로그: 하루만 운영하면 날짜는 텍스트로, 고른 길이를 보여준다', async ({
+  test('자습실 페이지: 하루만 운영하면 날짜는 텍스트로, 고른 길이를 보여준다', async ({
     page,
     seed,
   }) => {
     const room = await seed.room({ name: 'A 자습실' });
     const me = await seed.student('김하늘', '010-1111-1111');
     await enterAsStudent(page, me);
-    await page.goto(`/student/rooms?apply=${room.id}`);
+    await page.goto(`/student/rooms/${room.id}`);
 
-    const dialog = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
-    await expect(dialog.getByRole('combobox', { name: '날짜' })).toHaveCount(0);
-    await expect(dialog).toContainText('내일');
-    await expect(dialog).toContainText('2시간');
-    await pick(page, dialog.getByRole('combobox', { name: '방문 종료 시각' }), '11:30');
-    await expect(dialog).toContainText('1시간 30분');
+    const bar = page.getByRole('region', { name: '방문 시간' });
+    await expect(bar.getByRole('combobox', { name: '방문 날짜' })).toHaveCount(0);
+    await expect(bar).toContainText('내일');
+    await expect(bar).toContainText('2시간');
+    await pick(page, bar.getByRole('combobox', { name: '방문 종료 시각' }), '11:30');
+    await expect(bar).toContainText('1시간 30분');
   });
 
   test('내 신청 카드는 방문 시간이 가장 먼저 크게 보인다', async ({ page, seed }) => {
@@ -201,9 +198,8 @@ test.describe('시간 선택', () => {
     });
     const me = await seed.student('김하늘', '010-1111-1111');
     await enterAsStudent(page, me);
-    await page.goto(`/student/rooms?apply=${room.id}`);
-    const dialog = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
-    await expectOpensBelow(page, dialog.getByRole('combobox', { name: '방문 시작 시각' }));
-    await expectOpensBelow(page, dialog.getByRole('combobox', { name: '방문 종료 시각' }));
+    await page.goto(`/student/rooms/${room.id}`);
+    await expectOpensBelow(page, page.getByRole('combobox', { name: '방문 시작 시각' }));
+    await expectOpensBelow(page, page.getByRole('combobox', { name: '방문 종료 시각' }));
   });
 });
