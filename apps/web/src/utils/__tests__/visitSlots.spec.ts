@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  decodeSlot,
+  encodeSlot,
   findOverlap,
   hasAvailableSlot,
   slotToDate,
@@ -86,5 +88,33 @@ describe('findOverlap', () => {
 
   it('다른 신청이 없으면 겹치지 않는다', () => {
     expect(findOverlap(at('19:00'), at('21:00'), [])).toBeUndefined();
+  });
+});
+
+describe('encodeSlot / decodeSlot (URL 쿼리 slot)', () => {
+  const at = (iso: string) => new Date(iso);
+
+  it('방문 구간을 YYYY-MM-DDTHH:mm~HH:mm으로 만들고 되돌린다', () => {
+    const raw = encodeSlot(at('2026-11-20T19:00:00+09:00'), at('2026-11-20T21:30:00+09:00'));
+    expect(raw).toBe('2026-11-20T19:00~21:30');
+    expect(decodeSlot(raw)).toEqual({ date: '2026-11-20', start: '19:00', end: '21:30' });
+  });
+
+  it('자정에 끝나면 24:00으로 표기한다', () => {
+    expect(encodeSlot(at('2026-11-20T22:00:00+09:00'), at('2026-11-21T00:00:00+09:00'))).toBe(
+      '2026-11-20T22:00~24:00',
+    );
+    expect(decodeSlot('2026-11-20T22:00~24:00')).toEqual({
+      date: '2026-11-20',
+      start: '22:00',
+      end: '24:00',
+    });
+  });
+
+  it('형식이 틀리거나 시작 ≥ 종료면 null', () => {
+    expect(decodeSlot(undefined)).toBeNull();
+    expect(decodeSlot(['2026-11-20T19:00~21:00'])).toBeNull();
+    expect(decodeSlot('2026-11-20 19:00~21:00')).toBeNull();
+    expect(decodeSlot('2026-11-20T21:00~19:00')).toBeNull();
   });
 });

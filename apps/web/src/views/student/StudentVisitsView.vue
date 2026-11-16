@@ -6,6 +6,7 @@ import { studyRoomsApi } from '@/api/studyRooms';
 import { visitsApi } from '@/api/visits';
 import { useAsync } from '@/composables/useAsync';
 import { useDialogQuery } from '@/composables/useDialogQuery';
+import { useFullRoomFallback } from '@/composables/useFullRoomFallback';
 import { useHighlight, useRefetchOnVisible } from '@/composables/useRefetch';
 import { useStudentGuard } from '@/composables/useStudentGuard';
 import { useToast } from '@/composables/useToast';
@@ -23,6 +24,7 @@ import {
 import { errorMessage } from '@/utils/errorMessage';
 import { hasAvailableSlot } from '@/utils/visitSlots';
 import PageShell from '@/components/layout/PageShell.vue';
+import AlternativeRoomsDialog from '@/components/domain/AlternativeRoomsDialog.vue';
 import VisitFormDialog from '@/components/domain/VisitFormDialog.vue';
 import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
@@ -105,6 +107,9 @@ function reapplyRoom(v: Visit): StudyRoom | null {
   if (room.currentPersonnel >= room.maxPersonnel || !hasAvailableSlot(room)) return null;
   return room;
 }
+
+// 다시 신청이 정원 마감으로 거절되면 같은 시간에 자리가 남은 자습실 안내 (#35)
+const full = useFullRoomFallback(() => page.data.value, refresh);
 
 // 시간 변경 (?edit=visitId) · 다시 신청 (?apply=roomId)
 const editDialog = useDialogQuery('edit');
@@ -287,6 +292,15 @@ async function confirmCancel() {
       "
       @saved="onSaved"
       @stale="refresh"
+      @full="full.onFull"
+    />
+    <AlternativeRoomsDialog
+      v-if="full.fallback.value"
+      v-model:open="full.open.value"
+      :full-room-name="full.fallback.value.fullRoomName"
+      :range="full.fallback.value.range"
+      :rooms="full.fallback.value.rooms"
+      @pick="full.pick"
     />
     <ConfirmDialog
       v-model:open="cancelOpen"

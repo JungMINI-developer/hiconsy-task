@@ -100,3 +100,39 @@ export function slotToDate(date: string, time: string): Date | null {
 export function hasAvailableSlot(period: Period, now: Date = new Date()): boolean {
   return allStarts(period, now).length > 0;
 }
+
+/** 다이얼로그의 선택값 (날짜 `YYYY-MM-DD`, 시작·종료 `HH:mm`, 자정 종료는 `24:00`) */
+export interface SlotValue {
+  date: string;
+  start: string;
+  end: string;
+}
+
+/** 방문 구간 → 다이얼로그 선택값. 종료가 다음 날 0시면 `24:00`으로 표기한다 */
+export function toSlotValue(startAt: Date, endAt: Date): SlotValue {
+  const date = toDateInputValue(startAt);
+  return {
+    date,
+    start: toTimeValue(startAt),
+    end: toDateInputValue(endAt) !== date ? '24:00' : toTimeValue(endAt),
+  };
+}
+
+/**
+ * URL 쿼리용 문자열 `YYYY-MM-DDTHH:mm~HH:mm` (로컬 시간).
+ * 정원 마감 후 다른 자습실 신청 다이얼로그를 고른 시간으로 열 때 쓴다 (#35).
+ */
+export function encodeSlot(startAt: Date, endAt: Date): string {
+  const { date, start, end } = toSlotValue(startAt, endAt);
+  return `${date}T${start}~${end}`;
+}
+
+export function decodeSlot(raw: unknown): SlotValue | null {
+  if (typeof raw !== 'string') return null;
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})~(\d{2}:\d{2})$/.exec(raw);
+  if (!m) return null;
+  const [, date, start, end] = m as unknown as [string, string, string, string];
+  const s = slotToDate(date, start);
+  const e = slotToDate(date, end);
+  return s && e && s.getTime() < e.getTime() ? { date, start, end } : null;
+}
