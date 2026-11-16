@@ -87,8 +87,8 @@ function seatClass(seat: GridSeat) {
 </script>
 
 <template>
-  <!-- 30석(6줄)이어도 다이얼로그가 화면을 넘지 않게 폭을 제한한다 (칸 최대 약 57px, 320px 화면에서는 44px) -->
-  <div class="mx-auto flex w-full max-w-80 flex-col gap-3">
+  <!-- 칸은 너무 크지 않게(최대 52px) 두고 간격을 넓게. 좁은 화면에서는 칸이 줄어든다 (320px에서 약 48px) -->
+  <div class="mx-auto flex w-fit max-w-full flex-col gap-4">
     <ul class="flex flex-wrap gap-x-4 gap-y-1 text-caption text-fg-muted" aria-hidden="true">
       <li class="flex items-center gap-1.5">
         <span class="size-3.5 rounded-sm border border-line-input bg-surface" />빈 좌석
@@ -117,8 +117,8 @@ function seatClass(seat: GridSeat) {
         role="radiogroup"
         :aria-label="label ?? '좌석'"
         :aria-disabled="disabled || undefined"
-        class="grid gap-2"
-        :style="{ gridTemplateColumns: `repeat(${SEATS_PER_ROW}, minmax(0, 1fr))` }"
+        class="grid gap-3 sm:gap-4"
+        :style="{ gridTemplateColumns: `repeat(${SEATS_PER_ROW}, minmax(0, 3.25rem))` }"
       >
         <button
           v-for="(seat, index) in seats"
