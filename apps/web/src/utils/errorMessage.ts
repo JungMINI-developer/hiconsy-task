@@ -19,7 +19,10 @@ const MESSAGES: Record<string, string> = {
     '이미 신청한 자습실이에요. 시간을 바꾸려면 내 신청에서 변경해 주세요',
   [ErrorCode.VISIT_TIME_OVERLAP]:
     '같은 시간에 신청한 다른 자습실이 있어요. 겹치지 않는 시간을 골라 주세요',
-  [ErrorCode.CAPACITY_FULL]: '방금 정원이 다 찼어요. 다른 자습실을 골라 주세요',
+  [ErrorCode.CAPACITY_FULL]: '그 시간 내내 비어 있는 좌석이 없어요',
+  [ErrorCode.SEAT_TAKEN]: '방금 다른 학생이 그 좌석을 예약했어요. 다른 좌석을 골라 주세요',
+  [ErrorCode.SEAT_NOT_FOUND]: '이 좌석은 지금 쓸 수 없어요. 다른 좌석을 골라 주세요',
+  [ErrorCode.SEATS_IN_USE]: '없어질 좌석에 예약이 있어 줄일 수 없어요',
   [ErrorCode.VISIT_ALREADY_CANCELED]: '이미 취소한 신청이에요',
   [ErrorCode.VISIT_ALREADY_STARTED]: '이미 시작한 방문은 바꾸거나 취소할 수 없어요',
   [NETWORK_ERROR]: '연결이 불안정해요. 잠시 후 다시 시도해 주세요',
