@@ -99,6 +99,59 @@ test.describe('학생 · 방문 신청', () => {
     );
   });
 
+  test('내 다른 신청과 겹치는 시간은 고를 수 없다', async ({ page, seed }) => {
+    const roomA = await seed.room({ name: 'A 자습실' });
+    await seed.room({ name: 'B 자습실' });
+    const me = await seed.student('김하늘', '010-1111-1111');
+    await seed.visit(me.id, roomA.id, kst(1, 10), kst(1, 12));
+    await enterAsStudent(page, me);
+
+    await page.goto('/student/rooms');
+    await page
+      .getByRole('listitem')
+      .filter({ hasText: 'B 자습실' })
+      .getByRole('button', { name: '방문 신청' })
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'B 자습실 방문 신청' });
+    await expect(dialog).toContainText('내 다른 신청과 겹치는 시간은 고를 수 없어요');
+
+    // 겹치지 않는 첫 시각(A 신청이 끝나는 12:00)부터 고른다 — 맞닿는 구간은 허용
+    const startSelect = dialog.getByRole('combobox', { name: '방문 시작 시각' });
+    await expect(startSelect).toHaveText('12:00');
+    await startSelect.click();
+    const blocked = page.getByRole('option', { name: /^11:30/ });
+    await expect(blocked).toHaveAttribute('aria-disabled', 'true');
+    await expect(blocked).toContainText('다른 신청');
+    await page.keyboard.press('Escape');
+
+    await pick(page, dialog.getByRole('combobox', { name: '방문 종료 시각' }), '13:00');
+    await dialog.getByRole('button', { name: '신청하기' }).click();
+    await expect(toast(page, /방문을 신청했어요\. .* 12:00 – 13:00/)).toBeVisible();
+  });
+
+  test('다이얼로그를 연 사이 겹치는 신청이 생기면 이유를 보여주고 막는다', async ({
+    page,
+    seed,
+  }) => {
+    const roomA = await seed.room({ name: 'A 자습실' });
+    const roomB = await seed.room({ name: 'B 자습실' });
+    const me = await seed.student('김하늘', '010-1111-1111');
+    await enterAsStudent(page, me);
+
+    await page.goto(`/student/rooms?apply=${roomB.id}`);
+    const dialog = page.getByRole('dialog', { name: 'B 자습실 방문 신청' });
+    await expect(dialog.getByRole('combobox', { name: '방문 시작 시각' })).toHaveText('10:00');
+    await seed.visit(me.id, roomA.id, kst(1, 10), kst(1, 12)); // 다른 탭에서 먼저 신청
+    await dialog.getByRole('button', { name: '신청하기' }).click();
+
+    await expect(dialog).toContainText(
+      '같은 시간에 신청한 다른 자습실이 있어요. 겹치지 않는 시간을 골라 주세요',
+    );
+    // 내 신청을 다시 받아 겹치는 신청을 알려주고 제출을 막는다
+    await expect(dialog).toContainText('A 자습실 신청(10:00 – 12:00)과 겹쳐요');
+    await expect(dialog.getByRole('button', { name: '신청하기' })).toBeDisabled();
+  });
+
   test('자습실이 삭제되어 취소된 신청은 사유와 함께 남는다', async ({ page, seed }) => {
     const room = await seed.room({ name: 'A 자습실' });
     const me = await seed.student('김하늘', '010-1111-1111');
