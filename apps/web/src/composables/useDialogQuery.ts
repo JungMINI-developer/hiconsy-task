@@ -4,8 +4,10 @@ import { useRoute, useRouter } from 'vue-router';
 /**
  * 다이얼로그 열림 상태를 URL 쿼리와 동기화한다 (`?new=1`, `?edit=3`).
  * 새로고침·뒤로가기에도 유지된다. 열 때는 기록을 남기고(push) 닫을 때는 되돌린다(replace).
+ *
+ * @param options.clear 닫을 때 함께 지울 쿼리 (예: 신청 다이얼로그의 미리 고른 시간 `slot`)
  */
-export function useDialogQuery(key: string) {
+export function useDialogQuery(key: string, options: { clear?: string[] } = {}) {
   const route = useRoute();
   const router = useRouter();
 
@@ -21,7 +23,7 @@ export function useDialogQuery(key: string) {
   function close() {
     if (value.value === null) return;
     const query = { ...route.query };
-    delete query[key];
+    for (const k of [key, ...(options.clear ?? [])]) delete query[k];
     void router.replace({ query });
   }
 

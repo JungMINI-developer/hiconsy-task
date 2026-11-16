@@ -27,6 +27,7 @@ import {
   visitStartOptions,
   type BusyRange,
   type Period,
+  type SlotValue,
 } from '@/utils/visitSlots';
 import type { SelectOption } from '@/components/ui/AppSelect.vue';
 import AppAlert from '@/components/ui/AppAlert.vue';
@@ -53,12 +54,24 @@ const props = defineProps<{
   visit?: Visit | null;
   /** 신청 모드에서 보여줄 남은 자리 */
   remaining?: number;
+  /** 신청 모드에서 미리 고를 시간 (고를 수 없는 값이면 무시하고 기본값) */
+  initialSlot?: SlotValue | null;
 }>();
+
+/** 정원이 차서 신청이 거절됨 — 거절된 자습실과 고른 시간 */
+export interface FullRoomEvent {
+  room: VisitRoom;
+  startAt: Date;
+  endAt: Date;
+  /** 다른 자습실이 없을 때 보여줄 안내 문구 */
+  message: string;
+}
 
 const emit = defineEmits<{
   saved: [visit: Visit, mode: 'apply' | 'update'];
   /** 정원·기간이 바뀌어 목록을 다시 가져와야 함 */
   stale: [];
+  full: [event: FullRoomEvent];
 }>();
 
 const session = useSessionStore();
@@ -162,7 +175,7 @@ watch(
       start.value = toTimeValue(props.visit.startAt);
       const endAt = new Date(props.visit.endAt);
       end.value = toDateInputValue(endAt) !== date.value ? '24:00' : toTimeValue(endAt);
-    } else {
+    } else if (!applyInitialSlot()) {
       date.value = firstEnabled(dateOptions.value);
       start.value = firstEnabled(startOptions.value);
       end.value = defaultEnd();
@@ -170,6 +183,25 @@ watch(
   },
   { immediate: true },
 );
+
+/** 미리 고른 시간(정원 마감 후 다른 자습실 안내에서 넘어온 경우)이 지금 고를 수 있으면 채운다 */
+function applyInitialSlot(): boolean {
+  const slot = props.initialSlot;
+  if (!slot) return false;
+  const enabled = (options: SelectOption<string>[], value: string) =>
+    options.some((o) => o.value === value && !o.disabled);
+  date.value = slot.date;
+  start.value = slot.start;
+  end.value = slot.end;
+  if (
+    enabled(dateOptions.value, slot.date) &&
+    enabled(startOptions.value, slot.start) &&
+    enabled(endOptions.value, slot.end)
+  ) {
+    return true;
+  }
+  return false;
+}
 
 // 날짜를 바꾸면 시작이, 시작을 바꾸면 종료가 유효한지 맞춘다
 watch(date, () => {
@@ -236,6 +268,12 @@ function handleError(e: unknown) {
     return;
   }
   const code = e instanceof AppError ? e.code : null;
+  // 정원 마감: 닫고, 같은 시간에 자리가 남은 다른 자습실 안내는 화면이 맡는다 (#35)
+  if (code === ErrorCode.CAPACITY_FULL && !isEdit.value && props.room && selected.value) {
+    emit('full', { room: props.room, ...selected.value, message: errorMessage(e) });
+    open.value = false;
+    return;
+  }
   switch (code) {
     // 목록 기준이 바뀐 경우: 알리고 닫은 뒤 다시 조회
     case ErrorCode.CAPACITY_FULL:
