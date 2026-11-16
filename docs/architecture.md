@@ -128,13 +128,28 @@ e2e 테스트로 검증한다 (`test/visits.e2e-spec.ts`의 "동시성").
 
 ```
 src/
-  api/          # axios 인스턴스, API 호출 함수
-  views/        # 라우트 페이지
-  components/   # 재사용 컴포넌트
-  stores/       # Pinia 스토어
-  router/
+  main.ts, App.vue
+  router/               # 라우트 맵 + 역할 가드 (역할이 맞지 않으면 역할 선택으로)
+  api/                  # axios 인스턴스(client: 응답 언래핑·AppError 정규화), 리소스별 호출 함수
+  stores/               # Pinia: session(역할·선택한 학생, localStorage), myVisits(내 신청 — 헤더 배지와 학생 화면 공유)
+  views/
+    RoleSelectView      # S-00 역할 선택 (로그인 대체)
+    teacher/            # S-10 자습실 목록 · S-11 상세(신청자·이력) · S-13 학생 목록
+    student/            # S-20 자습실 목록 · S-21 내 신청
+  components/
+    ui/                 # 도메인을 모르는 공통 UI (Reka UI 래퍼: Dialog, Select, Tabs, Toast …)
+    domain/             # 자습실 카드·정원 막대·이력 타임라인, 등록/신청 다이얼로그(S-12·S-22), 정원 마감 안내(S-23)
+    layout/             # 헤더, 페이지 틀
+  composables/          # useAsync(로딩·에러·늦은 응답 무시), useDialogQuery(다이얼로그 ↔ URL 쿼리),
+                        # useFullRoomFallback(정원 마감 시 다른 자습실 안내), useToast …
+  utils/                # 순수 함수 — 날짜 표기, 방문 시간 선택지·겹침(visitSlots), 대체 자습실 후보, 에러 문구, 검증
+  styles/main.css       # Tailwind v4 @theme 디자인 토큰
+e2e/                    # Playwright (데스크톱 1280 + 모바일 320, 전용 DB)
 ```
 
-UI는 Reka UI(헤드리스) + Tailwind CSS v4로 구현하고, 디자인 토큰은 `@theme`에 정의합니다. 화면 구성, 라우트 맵, 컴포넌트 구조는 [apps/web/docs](../apps/web/docs/README.md)를 참고합니다.
+- **서버 데이터는 전역 캐시에 두지 않습니다.** 정원은 다른 학생의 신청으로 계속 바뀌므로, 화면 진입·변경 직후·탭 복귀 시 다시 조회합니다(`useAsync` + `useRefetchOnVisible`). 예외는 여러 화면이 같이 보는 "내 신청"(`myVisits`)뿐입니다.
+- **다이얼로그 열림 상태는 URL 쿼리**(`?apply=3`, `?edit=5`, 미리 고른 시간 `&slot=`)에 둡니다. 새로고침·뒤로가기·다른 화면에서 이어서 열기가 같은 방식으로 동작합니다.
+- **규칙 판단은 서버가 최종**입니다. 화면은 운영 기간 밖·지난 시각·내 신청과 겹치는 시각을 선택지에서 미리 막고(헛걸음 방지), 서버 에러 코드(`ErrorCode`)별로 안내·재조회를 정합니다(`VisitFormDialog`의 `handleError`).
+- **비즈니스 계산은 `utils`의 순수 함수**로 빼서 단위 테스트합니다(방문 시간 선택지, 겹침, 대체 자습실 후보, 날짜 표기). 화면 흐름은 Playwright로 검증합니다.
 
-> TODO: 도메인 구현 후 모듈/컴포넌트 구조 보완
+UI는 Reka UI(헤드리스) + Tailwind CSS v4로 구현하고, 디자인 토큰은 `@theme`에 정의합니다. 화면 명세(S-00~S-23), 라우트 맵, 사용자 흐름, 문구 규칙은 [apps/web/docs](../apps/web/docs/README.md)를 참고합니다.
