@@ -217,7 +217,7 @@ docs/               # 상세 문서
 - 문제 해결 기록 (문제·선택지·검증): [docs/solutions](./docs/solutions/)
   - [정원 마감 직전의 동시 신청 처리](./docs/solutions/study-room-capacity-concurrency.md) — 자습실 행 락, 대안 비교, 공정성
   - [방문 시간 겹침과 동시 요청 처리](./docs/solutions/visit-time-overlap-concurrency.md) — 학생 행 락 모드, 교착 상태
-  - [대기열: 대기 등록과 자리 제안](./docs/solutions/waitlist-offer.md) — 자동 확정 대신 제안, 지연 동기화, 롤백 함정, 학생 삭제 교착 상태 해소
+  - [대기열: 대기 등록과 자리 제안](./docs/solutions/waitlist-offer.md) (#44에서 제거한 기능의 기록) — 자동 확정 대신 제안, 지연 동기화, 롤백 함정, 학생 삭제 교착 상태 해소
 - 확정 전 설계 초안 (방향은 정했지만 구현 전): [docs/tbd](./docs/tbd/)
   - [좌석 단위 예약 전환](./docs/tbd/seat-based-reservation.md) — 자습실 단위 정원 → 학생이 좌석을 고르는 예약, 미정 결정 사항
 - UI/UX 설계 (사용자 흐름, 화면 명세, 디자인 시스템, UI 구현 방식): [apps/web/docs](./apps/web/docs/README.md)
