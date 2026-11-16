@@ -165,6 +165,7 @@ docs/               # 상세 문서
 
 - 아키텍처 (인프라, 소스 코드 구조, 요청 흐름): [docs/architecture.md](./docs/architecture.md)
 - 컨벤션 (브랜치 전략, 커밋, 코드 스타일): [CONTRIBUTING.md](./CONTRIBUTING.md)
+- 문제 해결 기록 (문제·선택지·검증): [docs/solutions](./docs/solutions/) — 예: [방문 시간 겹침과 동시 요청 처리](./docs/solutions/visit-time-overlap-concurrency.md)
 - UI/UX 설계 (사용자 흐름, 화면 명세, 디자인 시스템, UI 구현 방식): [apps/web/docs](./apps/web/docs/README.md)
 
 ---

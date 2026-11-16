@@ -111,6 +111,7 @@ prisma/
 - 락은 항상 학생 → 자습실 순서로 잡아 교착 상태를 피한다.
 
 e2e 테스트로 검증한다 (`test/visits.e2e-spec.ts`의 "동시성").
+시간 겹침 방지의 락 모드 선택 근거와 동시 요청 비교 결과는 [solutions/visit-time-overlap-concurrency.md](./solutions/visit-time-overlap-concurrency.md)에 정리했다.
 
 - 정원 3명 자습실에 10명이 동시에 신청하면 정확히 3명만 성공한다. 락을 빼고 실행하면 9명이 성공해 테스트가 실패하는 것을 확인했다.
 - 같은 학생의 동시 중복 신청은 1건만 성공한다.
