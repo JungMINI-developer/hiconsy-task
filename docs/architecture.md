@@ -73,37 +73,41 @@ prisma/
 
 전체 명세는 Swagger(`/api/docs`)에서 확인할 수 있다.
 
-| Method | Path                                              | 설명                                       | 주요 에러                                                                                                    |
-| ------ | ------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| GET    | `/api/study-rooms`                                | 자습실 목록 (삭제 제외, 현재 신청 인원)    |                                                                                                              |
-| POST   | `/api/study-rooms`                                | 자습실 등록                                | 400 `INVALID_PERIOD`                                                                                         |
-| GET    | `/api/study-rooms/:id`                            | 자습실 상세                                | 404 `STUDY_ROOM_NOT_FOUND`                                                                                   |
-| GET    | `/api/study-rooms/:id/histories`                  | 방문 신청·수정·취소 이력 (시간순)          | 404 `STUDY_ROOM_NOT_FOUND`                                                                                   |
-| GET    | `/api/study-rooms/:id/visits`                     | 유효 신청 (학생 연락처 포함, 방문 시작 순) | 404 `STUDY_ROOM_NOT_FOUND`                                                                                   |
-| PATCH  | `/api/study-rooms/:id`                            | 자습실 수정 (보낸 필드만)                  | 409 `CAPACITY_BELOW_CURRENT`, `PERIOD_EXCLUDES_VISITS`                                                       |
-| DELETE | `/api/study-rooms/:id`                            | Soft Delete + 유효 신청 자동 취소 (204)    | 404 `STUDY_ROOM_NOT_FOUND`                                                                                   |
-| GET    | `/api/students`                                   | 학생 목록 (삭제 제외, 이름순)              |                                                                                                              |
-| POST   | `/api/students`                                   | 학생 등록 (전화번호 정규화)                | 409 `DUPLICATE_PHONE`                                                                                        |
-| GET    | `/api/students/:id`                               | 학생 상세                                  | 404 `STUDENT_NOT_FOUND`                                                                                      |
-| PATCH  | `/api/students/:id`                               | 학생 수정 (보낸 필드만)                    | 404 `STUDENT_NOT_FOUND`, 409 `DUPLICATE_PHONE`                                                               |
-| DELETE | `/api/students/:id`                               | Soft Delete + 유효 신청 자동 취소 (204)    | 404 `STUDENT_NOT_FOUND`                                                                                      |
-| GET    | `/api/students/:studentId/visits`                 | 내 신청 목록 (취소 포함, 방문 시작 순)     | 404 `STUDENT_NOT_FOUND`                                                                                      |
-| POST   | `/api/students/:studentId/visits`                 | 방문 신청 / 취소 후 재신청                 | 400 `VISIT_IN_PAST`·`VISIT_OUT_OF_PERIOD`, 404 `STUDY_ROOM_NOT_FOUND`, 409 `ALREADY_APPLIED`·`CAPACITY_FULL` |
-| PATCH  | `/api/students/:studentId/visits/:visitId`        | 방문 시간 수정                             | 400, 404 `VISIT_NOT_FOUND`, 409 `VISIT_ALREADY_CANCELED`·`VISIT_ALREADY_STARTED`                             |
-| POST   | `/api/students/:studentId/visits/:visitId/cancel` | 방문 취소 (정원 복원)                      | 404 `VISIT_NOT_FOUND`, 409 `VISIT_ALREADY_CANCELED`·`VISIT_ALREADY_STARTED`                                  |
+| Method | Path                                              | 설명                                       | 주요 에러                                                                                                                         |
+| ------ | ------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/study-rooms`                                | 자습실 목록 (삭제 제외, 현재 신청 인원)    |                                                                                                                                   |
+| POST   | `/api/study-rooms`                                | 자습실 등록                                | 400 `INVALID_PERIOD`                                                                                                              |
+| GET    | `/api/study-rooms/:id`                            | 자습실 상세                                | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                        |
+| GET    | `/api/study-rooms/:id/histories`                  | 방문 신청·수정·취소 이력 (시간순)          | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                        |
+| GET    | `/api/study-rooms/:id/visits`                     | 유효 신청 (학생 연락처 포함, 방문 시작 순) | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                        |
+| PATCH  | `/api/study-rooms/:id`                            | 자습실 수정 (보낸 필드만)                  | 409 `CAPACITY_BELOW_CURRENT`, `PERIOD_EXCLUDES_VISITS`                                                                            |
+| DELETE | `/api/study-rooms/:id`                            | Soft Delete + 유효 신청 자동 취소 (204)    | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                        |
+| GET    | `/api/students`                                   | 학생 목록 (삭제 제외, 이름순)              |                                                                                                                                   |
+| POST   | `/api/students`                                   | 학생 등록 (전화번호 정규화)                | 409 `DUPLICATE_PHONE`                                                                                                             |
+| GET    | `/api/students/:id`                               | 학생 상세                                  | 404 `STUDENT_NOT_FOUND`                                                                                                           |
+| PATCH  | `/api/students/:id`                               | 학생 수정 (보낸 필드만)                    | 404 `STUDENT_NOT_FOUND`, 409 `DUPLICATE_PHONE`                                                                                    |
+| DELETE | `/api/students/:id`                               | Soft Delete + 유효 신청 자동 취소 (204)    | 404 `STUDENT_NOT_FOUND`                                                                                                           |
+| GET    | `/api/students/:studentId/visits`                 | 내 신청 목록 (취소 포함, 방문 시작 순)     | 404 `STUDENT_NOT_FOUND`                                                                                                           |
+| POST   | `/api/students/:studentId/visits`                 | 방문 신청 / 취소 후 재신청                 | 400 `VISIT_IN_PAST`·`VISIT_OUT_OF_PERIOD`, 404 `STUDY_ROOM_NOT_FOUND`, 409 `ALREADY_APPLIED`·`VISIT_TIME_OVERLAP`·`CAPACITY_FULL` |
+| PATCH  | `/api/students/:studentId/visits/:visitId`        | 방문 시간 수정                             | 400, 404 `VISIT_NOT_FOUND`, 409 `VISIT_TIME_OVERLAP`·`VISIT_ALREADY_CANCELED`·`VISIT_ALREADY_STARTED`                             |
+| POST   | `/api/students/:studentId/visits/:visitId/cancel` | 방문 취소 (정원 복원)                      | 404 `VISIT_NOT_FOUND`, 409 `VISIT_ALREADY_CANCELED`·`VISIT_ALREADY_STARTED`                                                       |
 
 #### 동시성 제어
 
 신청 정보를 바꾸는 모든 작업은 하나의 트랜잭션에서 아래 순서로 락을 잡는다.
 
-| 작업                            | 학생 행      | 자습실 행    |
-| ------------------------------- | ------------ | ------------ |
-| 방문 신청·재신청·시간 수정·취소 | `FOR SHARE`  | `FOR UPDATE` |
-| 자습실 수정·삭제                | -            | `FOR UPDATE` |
-| 학생 삭제                       | `FOR UPDATE` | -            |
+| 작업                       | 학생 행             | 자습실 행    |
+| -------------------------- | ------------------- | ------------ |
+| 방문 신청·재신청·시간 수정 | `FOR NO KEY UPDATE` | `FOR UPDATE` |
+| 방문 취소                  | `FOR SHARE`         | `FOR UPDATE` |
+| 자습실 수정·삭제           | -                   | `FOR UPDATE` |
+| 학생 삭제                  | `FOR UPDATE`        | -            |
 
 - **자습실 행 `FOR UPDATE`** (`lockStudyRoom()`): 같은 자습실의 작업끼리 직렬화된다. "인원 세기 → 저장" 사이에 다른 신청이 끼어들 수 없어 정원이 지켜지고, 정원 축소·기간 변경 검사와 신청이 엇갈리지 않는다. 다른 자습실 작업은 기다리지 않는다.
-- **학생 행 `FOR SHARE`** (`lockStudent()`): 같은 학생의 신청끼리는 막지 않으면서, 동시에 진행되는 학생 삭제와는 직렬화되어 "삭제된 학생의 유효 신청"이 생기지 않는다.
+- **학생 행 락** (`lockStudent()`): 어떤 모드든 학생 삭제(`FOR UPDATE`)와 직렬화되어 "삭제된 학생의 유효 신청"이 생기지 않는다.
+  - 신청·시간 수정은 `FOR NO KEY UPDATE`로 **같은 학생의 신청끼리도 직렬화**한다. A·B 자습실에 같은 시간으로 동시에 신청하면 자습실 락이 서로 달라 둘 다 "시간 겹침 검사"를 통과할 수 있기 때문이다 (requirements 9절 #13).
+  - `FOR UPDATE`가 아닌 `FOR NO KEY UPDATE`인 이유: 자습실 삭제는 자습실 락을 잡은 채 `visit_histories`에 행을 넣고, 이때 FK 검사가 학생 행에 `FOR KEY SHARE`를 건다. 신청 쪽이 학생 행을 `FOR UPDATE`로 잡고 자습실 락을 기다리면 서로를 기다리는 교착 상태가 된다. `FOR NO KEY UPDATE`는 `FOR KEY SHARE`와 충돌하지 않는다.
+  - 취소는 겹침을 만들 수 없으므로 `FOR SHARE`로 충분하다.
 - 락은 항상 학생 → 자습실 순서로 잡아 교착 상태를 피한다.
 
 e2e 테스트로 검증한다 (`test/visits.e2e-spec.ts`의 "동시성").
@@ -111,6 +115,8 @@ e2e 테스트로 검증한다 (`test/visits.e2e-spec.ts`의 "동시성").
 - 정원 3명 자습실에 10명이 동시에 신청하면 정확히 3명만 성공한다. 락을 빼고 실행하면 9명이 성공해 테스트가 실패하는 것을 확인했다.
 - 같은 학생의 동시 중복 신청은 1건만 성공한다.
 - 정원 축소와 신청이 동시에 들어와도 정원을 넘지 않는다.
+- 같은 학생이 5개 자습실에 같은 시간으로 동시에 신청하면 1건만 성공한다. 학생 락을 `FOR SHARE`로 낮추면 여러 건이 성공해 테스트가 실패하는 것을 확인했다.
+- 시간 수정과 그 자습실 삭제가 동시에 들어와도 교착 상태 없이 처리된다. 학생 락을 `FOR UPDATE`로 올리면 PostgreSQL이 `deadlock detected`로 한쪽을 중단시켜 테스트가 실패하는 것을 확인했다.
 
 ### `apps/web` (Vue 3)
 

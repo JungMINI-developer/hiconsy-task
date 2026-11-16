@@ -147,6 +147,12 @@ stateDiagram-v2
 
 락 범위가 "자습실 1행"이라 다른 자습실 신청은 막지 않는다. 현재 인원을 `study_rooms`에 카운터 컬럼으로 두는 방법도 있지만, 상태와 카운터가 어긋날 위험이 있어 `visits(study_room_id, status)` 인덱스로 매번 세는 쪽을 택했다. 실제 락 적용은 방문 신청 API 구현에서 한다.
 
+#### 같은 학생의 시간 겹침 방지
+
+같은 학생의 유효 신청끼리는 방문 구간이 겹치면 안 된다(requirements 9절 #13). 자습실이 다르면 자습실 락이 서로 달라 막지 못하므로, 신청·시간 수정은 **학생 행을 `FOR NO KEY UPDATE`로 잠근 뒤** `start_at < 새 종료 AND end_at > 새 시작`인 유효 신청이 있는지 검사한다. 조회는 `UNIQUE(student_id, study_room_id)` 인덱스의 앞 컬럼(`student_id`)을 탄다.
+
+PostgreSQL 배제 제약(`EXCLUDE USING gist (student_id WITH =, tstzrange(start_at, end_at) WITH &&) WHERE (status = 'APPLIED')`)이면 DB가 직접 보장하지만, `btree_gist` 확장이 필요하고 Prisma 스키마로 표현할 수 없어 마이그레이션 SQL을 손으로 관리해야 한다(스키마와 DB가 어긋났다고 판단할 위험). 정원과 같은 방식(트랜잭션 + 행 락)으로 맞추는 쪽을 택했다.
+
 ### 5. 이력 테이블의 비정규화와 확장 필드
 
 - `study_room_id`, `student_id`를 이력에도 둔다. `visits`를 거치지 않고 "자습실별 이력(FN-ROM-03)"과 "학생별 이력"을 시간순 인덱스(`(study_room_id, created_at)`, `(student_id, created_at)`)로 바로 조회하기 위해서다. 이력은 불변 데이터라 비정규화로 인한 갱신 이상이 없다.
