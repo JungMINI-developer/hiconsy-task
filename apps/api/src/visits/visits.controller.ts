@@ -38,7 +38,7 @@ export class VisitsController {
     description: 'INVALID_PERIOD / VISIT_IN_PAST / VISIT_OUT_OF_PERIOD / 입력값 검증 실패',
   })
   @ApiResponse({ status: 404, description: 'STUDENT_NOT_FOUND / STUDY_ROOM_NOT_FOUND' })
-  @ApiResponse({ status: 409, description: 'ALREADY_APPLIED / CAPACITY_FULL' })
+  @ApiResponse({ status: 409, description: 'ALREADY_APPLIED / VISIT_TIME_OVERLAP / CAPACITY_FULL' })
   apply(
     @Param('studentId', ParseIntPipe) studentId: number,
     @Body() dto: CreateVisitDto,
@@ -50,7 +50,10 @@ export class VisitsController {
   @ApiOperation({ summary: '방문 시간 수정' })
   @ApiResponse({ status: 400, description: 'INVALID_PERIOD / VISIT_IN_PAST / VISIT_OUT_OF_PERIOD' })
   @ApiResponse({ status: 404, description: 'STUDENT_NOT_FOUND / VISIT_NOT_FOUND' })
-  @ApiResponse({ status: 409, description: 'VISIT_ALREADY_CANCELED / VISIT_ALREADY_STARTED' })
+  @ApiResponse({
+    status: 409,
+    description: 'VISIT_TIME_OVERLAP / VISIT_ALREADY_CANCELED / VISIT_ALREADY_STARTED',
+  })
   updateTime(
     @Param('studentId', ParseIntPipe) studentId: number,
     @Param('visitId', ParseIntPipe) visitId: number,
