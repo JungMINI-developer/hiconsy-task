@@ -34,3 +34,20 @@ export function scrollToItem(selector: string) {
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   el.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
 }
+
+/** 자동 갱신 주기 (#49 — 보는 동안 다른 학생이 신청할 수 있다) */
+export const AUTO_REFRESH_MS = 30_000;
+
+/**
+ * 화면을 보는 동안 주기적으로 다시 받는다. 창이 가려져 있으면 건너뛴다
+ * (다시 보이면 `useRefetchOnVisible`이 바로 받는다).
+ */
+export function useAutoRefresh(refetch: () => unknown, intervalMs = AUTO_REFRESH_MS) {
+  let timer: ReturnType<typeof setInterval> | undefined;
+  onMounted(() => {
+    timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void refetch();
+    }, intervalMs);
+  });
+  onBeforeUnmount(() => clearInterval(timer));
+}

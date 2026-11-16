@@ -29,6 +29,13 @@ export interface StudyRoom {
   maxPersonnel: number;
   /** 현재 유효 신청(APPLIED) 건수. 좌석을 시간별로 나눠 쓰므로 최대 인원보다 많을 수 있다 */
   currentPersonnel: number;
+  /**
+   * 지금 시각이 방문 구간 안에 있는 유효 신청 수 = 지금 이용 중인 좌석 수 (예약 기준, #49).
+   * 운영 시간이 아니면 null
+   */
+  occupiedSeats: number | null;
+  /** 남은 운영 시간에 30분 이상 비는 좌석이 하나라도 있는지. false면 학생 신청을 막는다 */
+  hasFreeSlot: boolean;
   startDate: IsoDateString;
   endDate: IsoDateString;
   createdAt: IsoDateString;

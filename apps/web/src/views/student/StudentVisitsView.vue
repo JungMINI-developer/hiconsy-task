@@ -5,12 +5,9 @@ import type { StudyRoom, Visit } from '@hiconsy/shared';
 import { studyRoomsApi } from '@/api/studyRooms';
 import { visitsApi } from '@/api/visits';
 import { useAsync } from '@/composables/useAsync';
-import { useDialogQuery } from '@/composables/useDialogQuery';
-import { useFullRoomFallback } from '@/composables/useFullRoomFallback';
-import { useHighlight, useRefetchOnVisible } from '@/composables/useRefetch';
+import { useRefetchOnVisible } from '@/composables/useRefetch';
 import { useStudentGuard } from '@/composables/useStudentGuard';
 import { useToast } from '@/composables/useToast';
-import { useVisitToast } from '@/composables/useVisitToast';
 import { isVisitEditable, useMyVisitsStore, visitGroup, type VisitGroup } from '@/stores/myVisits';
 import { useSessionStore } from '@/stores/session';
 import { cn } from '@/utils/cn';
@@ -24,8 +21,6 @@ import {
 import { errorMessage } from '@/utils/errorMessage';
 import { hasAvailableSlot } from '@/utils/visitSlots';
 import PageShell from '@/components/layout/PageShell.vue';
-import AlternativeRoomsDialog from '@/components/domain/AlternativeRoomsDialog.vue';
-import VisitFormDialog from '@/components/domain/VisitFormDialog.vue';
 import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppSkeleton from '@/components/ui/AppSkeleton.vue';
@@ -38,9 +33,7 @@ import { buttonVariants } from '@/components/ui/variants';
 const session = useSessionStore();
 const myVisits = useMyVisitsStore();
 const toast = useToast();
-const visitToast = useVisitToast();
 const handleStudentGone = useStudentGuard();
-const { highlightedId, highlight } = useHighlight();
 
 // 다시 신청 가능 여부를 알기 위해 자습실 목록도 함께 가져온다
 const page = useAsync(async () => {
@@ -99,50 +92,13 @@ function visitText(v: Pick<Visit, 'startAt' | 'endAt'>) {
 
 const isStarted = (v: Visit) => new Date(v.startAt).getTime() <= Date.now();
 
-/** 취소한 방문을 다시 신청할 수 있는 자습실 (삭제·종료·마감·이미 신청함이면 null) */
+/** 취소한 방문을 다시 신청할 수 있는 자습실 (삭제·종료·남은 시간에 빈 좌석 없음·이미 신청함이면 null) */
 function reapplyRoom(v: Visit): StudyRoom | null {
   if (v.studyRoom.deleted || myVisits.activeByRoom.has(v.studyRoom.id)) return null;
   const room = page.data.value?.find((r) => r.id === v.studyRoom.id);
   if (!room || getRoomPhase(room) === 'ended') return null;
-  if (room.currentPersonnel >= room.maxPersonnel || !hasAvailableSlot(room)) return null;
+  if (!room.hasFreeSlot || !hasAvailableSlot(room)) return null;
   return room;
-}
-
-// 다시 신청이 정원 마감으로 거절되면 같은 시간에 자리가 남은 자습실 안내 (#35)
-const full = useFullRoomFallback(() => page.data.value, refresh);
-
-// 시간 변경 (?edit=visitId) · 다시 신청 (?apply=roomId)
-const editDialog = useDialogQuery('edit');
-const applyDialog = useDialogQuery('apply');
-const editingVisit = computed(
-  () =>
-    myVisits.visits.find((v) => String(v.id) === editDialog.value.value && isVisitEditable(v)) ??
-    null,
-);
-const applyingRoom = computed(() => {
-  const visit = myVisits.visits.find(
-    (v) => v.status === 'CANCELED' && String(v.studyRoom.id) === applyDialog.value.value,
-  );
-  return visit ? reapplyRoom(visit) : null;
-});
-const editOpen = computed({
-  get: () => !!editingVisit.value,
-  set: (v: boolean) => !v && editDialog.close(),
-});
-const applyOpen = computed({
-  get: () => !!applyingRoom.value,
-  set: (v: boolean) => !v && applyDialog.close(),
-});
-
-function onSaved(visit: Visit, mode: 'apply' | 'update') {
-  if (mode === 'apply') {
-    visitToast.applied(visit);
-    tab.value = 'upcoming';
-  } else {
-    visitToast.updated(editingVisit.value, visit);
-  }
-  highlight(visit.id);
-  void refresh();
 }
 
 // 취소
@@ -208,12 +164,7 @@ async function confirmCancel() {
         <li
           v-for="visit in visible"
           :key="visit.id"
-          :class="
-            cn(
-              'flex flex-col gap-3 rounded-xl bg-surface p-4 sm:p-5',
-              highlightedId === visit.id && 'animate-highlight',
-            )
-          "
+          class="flex flex-col gap-3 rounded-xl bg-surface p-4 sm:p-5"
         >
           <div class="flex items-start justify-between gap-3">
             <!-- 가장 중요한 건 "언제 가는지" — 방문 시간을 크게, 자습실 이름은 위에 작게 -->
@@ -238,7 +189,8 @@ async function confirmCancel() {
           </div>
 
           <p class="text-caption text-fg-muted tabular-nums">
-            신청 {{ formatDate(visit.createdAt) }}
+            <template v-if="visit.seat">{{ visit.seat.number }}번 좌석 · </template>신청
+            {{ formatDate(visit.createdAt) }}
             <template v-if="visit.status === 'CANCELED' && visit.canceledAt">
               · 취소 {{ formatDate(visit.canceledAt) }}
               <template v-if="visit.studyRoom.deleted">
@@ -253,9 +205,17 @@ async function confirmCancel() {
           >
             <template v-if="tab === 'upcoming'">
               <template v-if="isVisitEditable(visit)">
-                <AppButton variant="secondary" size="sm" @click="editDialog.open(visit.id)">
-                  시간 변경
-                </AppButton>
+                <RouterLink
+                  :to="{
+                    name: 'student-room',
+                    params: { id: visit.studyRoom.id },
+                    query: { edit: '1' },
+                  }"
+                  :class="buttonVariants({ variant: 'secondary', size: 'sm' })"
+                  :aria-label="`${visit.studyRoom.name} 신청 변경`"
+                >
+                  변경
+                </RouterLink>
                 <AppButton variant="danger-weak" size="sm" @click="canceling = visit">
                   취소
                 </AppButton>
@@ -264,44 +224,18 @@ async function confirmCancel() {
                 이미 시작한 방문은 바꾸거나 취소할 수 없어요
               </p>
             </template>
-            <AppButton
+            <RouterLink
               v-else
-              variant="weak"
-              size="sm"
-              @click="applyDialog.open(visit.studyRoom.id)"
+              :to="{ name: 'student-room', params: { id: visit.studyRoom.id } }"
+              :class="buttonVariants({ variant: 'weak', size: 'sm' })"
             >
               다시 신청
-            </AppButton>
+            </RouterLink>
           </div>
         </li>
       </ul>
     </template>
 
-    <VisitFormDialog
-      v-model:open="editOpen"
-      :room="null"
-      :visit="editingVisit"
-      @saved="onSaved"
-      @stale="refresh"
-    />
-    <VisitFormDialog
-      v-model:open="applyOpen"
-      :room="applyingRoom"
-      :remaining="
-        applyingRoom ? applyingRoom.maxPersonnel - applyingRoom.currentPersonnel : undefined
-      "
-      @saved="onSaved"
-      @stale="refresh"
-      @full="full.onFull"
-    />
-    <AlternativeRoomsDialog
-      v-if="full.fallback.value"
-      v-model:open="full.open.value"
-      :full-room-name="full.fallback.value.fullRoomName"
-      :range="full.fallback.value.range"
-      :rooms="full.fallback.value.rooms"
-      @pick="full.pick"
-    />
     <ConfirmDialog
       v-model:open="cancelOpen"
       title="방문을 취소할까요?"

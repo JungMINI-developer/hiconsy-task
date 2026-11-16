@@ -1,15 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
+import { RouterLink } from 'vue-router';
 import type { StudyRoom, Visit } from '@hiconsy/shared';
 import { Check } from 'lucide-vue-next';
 import { studyRoomsApi } from '@/api/studyRooms';
 import { useAsync } from '@/composables/useAsync';
-import { useDialogQuery } from '@/composables/useDialogQuery';
-import { useFullRoomFallback } from '@/composables/useFullRoomFallback';
-import { useHighlight, useRefetchOnVisible } from '@/composables/useRefetch';
+import { useRefetchOnVisible } from '@/composables/useRefetch';
 import { useStudentGuard } from '@/composables/useStudentGuard';
-import { useVisitToast } from '@/composables/useVisitToast';
 import { isVisitEditable, useMyVisitsStore } from '@/stores/myVisits';
 import {
   formatDate,
@@ -19,12 +16,9 @@ import {
   formatRange,
 } from '@/utils/datetime';
 import { errorMessage } from '@/utils/errorMessage';
-import { decodeSlot, hasAvailableSlot } from '@/utils/visitSlots';
+import { hasAvailableSlot } from '@/utils/visitSlots';
 import PageShell from '@/components/layout/PageShell.vue';
-import CapacityBar from '@/components/domain/CapacityBar.vue';
 import StudyRoomCard from '@/components/domain/StudyRoomCard.vue';
-import AlternativeRoomsDialog from '@/components/domain/AlternativeRoomsDialog.vue';
-import VisitFormDialog from '@/components/domain/VisitFormDialog.vue';
 import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppSkeleton from '@/components/ui/AppSkeleton.vue';
@@ -34,8 +28,6 @@ import { buttonVariants } from '@/components/ui/variants';
 
 const myVisits = useMyVisitsStore();
 const handleStudentGone = useStudentGuard();
-const visitToast = useVisitToast();
-const { highlightedId, highlight } = useHighlight();
 
 // 자습실과 내 신청을 함께 가져온다 (카드에 내 신청 여부를 바로 보여주기 위해)
 const page = useAsync(async () => {
@@ -48,14 +40,26 @@ async function refresh() {
 }
 useRefetchOnVisible(refresh);
 
-type CardState = 'applied' | 'available' | 'full' | 'closing';
+/**
+ * - applied: 내 유효 신청이 있음
+ * - closing: 신청할 수 있는 시간이 지남 (남은 운영 시간이 30분 미만)
+ * - noSeat: 남은 운영 시간 어디에도 30분 이상 빈 좌석이 없음 (#49) — 지금만 다 차 있는 건 막지 않는다
+ */
+type CardState = 'applied' | 'available' | 'noSeat' | 'closing';
 
 interface RoomCard {
   room: StudyRoom;
   state: CardState;
   myVisit?: Visit;
-  remaining: number;
 }
+
+/** 신청 버튼을 막는 이유 (applied·available은 막지 않음) */
+const REASON: Record<CardState, string> = {
+  applied: '',
+  available: '',
+  closing: '신청할 수 있는 시간이 지났어요',
+  noSeat: '남은 시간에 빈 좌석이 없어요',
+};
 
 /** 종료된 자습실은 숨기고, 카드 상태를 정한다 (screens.md S-20) */
 const cards = computed<RoomCard[]>(() =>
@@ -63,53 +67,25 @@ const cards = computed<RoomCard[]>(() =>
     .filter((room) => getRoomPhase(room) !== 'ended')
     .map((room) => {
       const myVisit = myVisits.activeByRoom.get(room.id);
-      const remaining = Math.max(room.maxPersonnel - room.currentPersonnel, 0);
       let state: CardState = 'available';
       if (myVisit) state = 'applied';
-      else if (remaining === 0) state = 'full';
       else if (!hasAvailableSlot(room)) state = 'closing';
-      return { room, state, myVisit, remaining };
+      else if (!room.hasFreeSlot) state = 'noSeat';
+      return { room, state, myVisit };
     }),
 );
 
-function visitText(v: Visit) {
-  return isSameDay(v.startAt, v.endAt)
-    ? `${formatDate(v.startAt)} ${formatTimeRange(v.startAt, v.endAt)}`
-    : formatRange(v.startAt, v.endAt);
+/** `좌석 10석 · 지금 6석 이용 중` — 운영 시간이 아니면 좌석 수만 (#49) */
+function seatText(room: StudyRoom) {
+  const total = `좌석 ${room.maxPersonnel}석`;
+  return room.occupiedSeats === null ? total : `${total} · 지금 ${room.occupiedSeats}석 이용 중`;
 }
 
-// 신청 (?apply=roomId, 미리 고른 시간 &slot=) · 시간 변경 (?edit=visitId)
-const route = useRoute();
-const applyDialog = useDialogQuery('apply', { clear: ['slot'] });
-const initialSlot = computed(() => decodeSlot(route.query.slot));
-// 정원 마감 시 같은 시간에 자리가 남은 자습실 안내 (#35)
-const full = useFullRoomFallback(() => page.data.value, refresh);
-const editDialog = useDialogQuery('edit');
-const applyingCard = computed(
-  () =>
-    cards.value.find(
-      (c) => String(c.room.id) === applyDialog.value.value && c.state === 'available',
-    ) ?? null,
-);
-const editingVisit = computed(
-  () =>
-    myVisits.visits.find((v) => String(v.id) === editDialog.value.value && isVisitEditable(v)) ??
-    null,
-);
-const applyOpen = computed({
-  get: () => !!applyingCard.value,
-  set: (v: boolean) => !v && applyDialog.close(),
-});
-const editOpen = computed({
-  get: () => !!editingVisit.value,
-  set: (v: boolean) => !v && editDialog.close(),
-});
-
-function onSaved(visit: Visit, mode: 'apply' | 'update') {
-  if (mode === 'apply') visitToast.applied(visit);
-  else visitToast.updated(editingVisit.value, visit);
-  highlight(visit.studyRoom.id);
-  void refresh();
+function visitText(v: Visit) {
+  const time = isSameDay(v.startAt, v.endAt)
+    ? `${formatDate(v.startAt)} ${formatTimeRange(v.startAt, v.endAt)}`
+    : formatRange(v.startAt, v.endAt);
+  return v.seat ? `${time} · ${v.seat.number}번 좌석` : time;
 }
 </script>
 
@@ -136,13 +112,12 @@ function onSaved(visit: Visit, mode: 'apply' | 'update') {
       />
       <ul v-else class="grid gap-3 lg:grid-cols-2">
         <li v-for="{ room, state, myVisit } in cards" :key="room.id">
-          <StudyRoomCard :room="room" :highlighted="highlightedId === room.id">
+          <StudyRoomCard :room="room">
             <template #badges>
               <AppBadge v-if="state === 'applied'" tone="applied">
                 <Check class="size-3.5" aria-hidden="true" />
                 신청함
               </AppBadge>
-              <AppBadge v-else-if="state === 'full'" tone="full">정원 마감</AppBadge>
               <AppBadge v-else-if="getRoomPhase(room) === 'open'" tone="open">운영 중</AppBadge>
             </template>
 
@@ -153,23 +128,19 @@ function onSaved(visit: Visit, mode: 'apply' | 'update') {
               >
                 내 방문 {{ visitText(myVisit) }}
               </p>
-              <CapacityBar
-                :current="room.currentPersonnel"
-                :max="room.maxPersonnel"
-                perspective="student"
-              />
+              <p class="text-label text-fg-muted tabular-nums">{{ seatText(room) }}</p>
             </div>
 
             <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
               <template v-if="state === 'applied' && myVisit">
-                <AppButton
+                <RouterLink
                   v-if="isVisitEditable(myVisit)"
-                  variant="secondary"
-                  size="sm"
-                  @click="editDialog.open(myVisit.id)"
+                  :to="{ name: 'student-room', params: { id: room.id }, query: { edit: '1' } }"
+                  :class="buttonVariants({ variant: 'secondary', size: 'sm' })"
+                  :aria-label="`${room.name} 신청 변경`"
                 >
-                  시간 변경
-                </AppButton>
+                  변경
+                </RouterLink>
                 <RouterLink
                   :to="{ name: 'student-visits' }"
                   :class="buttonVariants({ variant: 'ghost', size: 'sm' })"
@@ -183,14 +154,22 @@ function onSaved(visit: Visit, mode: 'apply' | 'update') {
                   :id="`reason-${room.id}`"
                   class="text-caption text-fg-muted"
                 >
-                  {{ state === 'full' ? '정원이 다 찼어요' : '신청할 수 있는 시간이 지났어요' }}
+                  {{ REASON[state] }}
                 </span>
+                <RouterLink
+                  v-if="state === 'available'"
+                  :to="{ name: 'student-room', params: { id: room.id } }"
+                  :class="buttonVariants({ variant: 'weak', size: 'sm' })"
+                  :aria-label="`${room.name} 방문 신청`"
+                >
+                  방문 신청
+                </RouterLink>
                 <AppButton
+                  v-else
                   variant="weak"
                   size="sm"
-                  :disabled="state !== 'available'"
-                  :aria-describedby="state !== 'available' ? `reason-${room.id}` : undefined"
-                  @click="applyDialog.open(room.id)"
+                  disabled
+                  :aria-describedby="`reason-${room.id}`"
                 >
                   방문 신청
                 </AppButton>
@@ -200,30 +179,5 @@ function onSaved(visit: Visit, mode: 'apply' | 'update') {
         </li>
       </ul>
     </template>
-
-    <VisitFormDialog
-      v-model:open="applyOpen"
-      :room="applyingCard?.room ?? null"
-      :remaining="applyingCard?.remaining"
-      :initial-slot="initialSlot"
-      @saved="onSaved"
-      @stale="refresh"
-      @full="full.onFull"
-    />
-    <VisitFormDialog
-      v-model:open="editOpen"
-      :room="null"
-      :visit="editingVisit"
-      @saved="onSaved"
-      @stale="refresh"
-    />
-    <AlternativeRoomsDialog
-      v-if="full.fallback.value"
-      v-model:open="full.open.value"
-      :full-room-name="full.fallback.value.fullRoomName"
-      :range="full.fallback.value.range"
-      :rooms="full.fallback.value.rooms"
-      @pick="full.pick"
-    />
   </PageShell>
 </template>

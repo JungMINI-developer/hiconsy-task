@@ -6,21 +6,16 @@ import type { Locator, Page } from '@playwright/test';
 
 test.describe('토스트', () => {
   test('화면 가운데 아래에 뜨고, 연달아 오면 모두 보인다', async ({ page, seed }) => {
-    await seed.room({ name: 'A 자습실' });
-    await seed.room({ name: 'B 자습실' });
+    const room = await seed.room({ name: 'A 자습실' });
     const me = await seed.student('김하늘', '010-1111-1111');
     await enterAsStudent(page, me);
-    await page.goto('/student/rooms');
+    await page.goto(`/student/rooms/${room.id}`);
 
-    for (const name of ['A 자습실', 'B 자습실']) {
-      await page
-        .getByRole('listitem')
-        .filter({ hasText: name })
-        .getByRole('button', { name: '방문 신청' })
-        .click();
-      await page.getByRole('dialog').getByRole('button', { name: '신청하기' }).click();
-      await expect(page.getByRole('dialog')).toBeHidden();
-    }
+    // 한 페이지에서 연달아: 신청 → 좌석 변경 (토스트는 4초 동안 남는다)
+    await page.getByRole('button', { name: '신청하기' }).click();
+    await page.getByRole('button', { name: '좌석 변경' }).click();
+    await page.getByRole('radio', { name: '2번 좌석, 비어 있음' }).click();
+    await page.getByRole('button', { name: '변경하기' }).click();
 
     const items = page.getByRole('region', { name: /알림/ }).getByRole('listitem');
     await expect(items).toHaveCount(2);
@@ -119,38 +114,38 @@ test.describe('역할 선택', () => {
 });
 
 test.describe('학생 · 표기', () => {
-  test('정원 막대는 남은 자리만큼 차고, 오늘·내일은 상대 날짜로 보인다', async ({ page, seed }) => {
-    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 10 });
-    const others = await Promise.all(
-      Array.from({ length: 8 }, (_, i) => seed.student(`학생${i}`, `010-2000-00${10 + i}`)),
-    );
-    for (const [i, o] of others.entries())
-      await seed.visit(o.id, room.id, kst(1, 10 + i), kst(1, 11 + i));
+  test('자습실 카드는 좌석 수를 보여주고, 오늘·내일은 상대 날짜로 보인다', async ({
+    page,
+    seed,
+  }) => {
+    await seed.room({ name: 'A 자습실', maxPersonnel: 10 });
     const me = await seed.student('김하늘', '010-1111-1111');
     await enterAsStudent(page, me);
 
     await page.goto('/student/rooms');
     const card = page.getByRole('listitem').filter({ hasText: 'A 자습실' });
-    const meter = card.getByRole('meter', { name: '남은 자리' });
-    await expect(meter).toHaveAttribute('aria-valuenow', '2');
+    // 운영 시간이 아니면(내일) 좌석 수만, 정원 막대는 없다 (#49)
+    await expect(card).toContainText('좌석 10석');
+    await expect(card).not.toContainText('이용 중');
+    await expect(card.getByRole('meter')).toHaveCount(0);
     await expect(card).toContainText('내일 10:00 – 22:00');
   });
 
-  test('신청 다이얼로그: 하루만 운영하면 날짜는 텍스트로, 고른 길이를 보여준다', async ({
+  test('자습실 페이지: 하루만 운영하면 날짜는 텍스트로, 고른 길이를 보여준다', async ({
     page,
     seed,
   }) => {
     const room = await seed.room({ name: 'A 자습실' });
     const me = await seed.student('김하늘', '010-1111-1111');
     await enterAsStudent(page, me);
-    await page.goto(`/student/rooms?apply=${room.id}`);
+    await page.goto(`/student/rooms/${room.id}`);
 
-    const dialog = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
-    await expect(dialog.getByRole('combobox', { name: '날짜' })).toHaveCount(0);
-    await expect(dialog).toContainText('내일');
-    await expect(dialog).toContainText('2시간');
-    await pick(page, dialog.getByRole('combobox', { name: '방문 종료 시각' }), '11:30');
-    await expect(dialog).toContainText('1시간 30분');
+    const bar = page.getByRole('region', { name: '방문 시간' });
+    await expect(bar.getByRole('combobox', { name: '방문 날짜' })).toHaveCount(0);
+    await expect(bar).toContainText('내일');
+    await expect(bar).toContainText('2시간');
+    await pick(page, bar.getByRole('combobox', { name: '방문 종료 시각' }), '11:30');
+    await expect(bar).toContainText('1시간 30분');
   });
 
   test('내 신청 카드는 방문 시간이 가장 먼저 크게 보인다', async ({ page, seed }) => {
@@ -176,7 +171,8 @@ async function expectOpensBelow(page: Page, trigger: Locator) {
   const list = page.getByRole('listbox');
   await expect(list).toBeVisible();
   const l = (await list.boundingBox())!;
-  expect(l.y, '목록이 필드 아래에서 시작').toBeGreaterThanOrEqual(t.y + t.height);
+  // 다이얼로그 세로 가운데 정렬이 소수점 px에 걸리면 목록 위치가 정수 px로 반올림된다 (1px 허용)
+  expect(l.y, '목록이 필드 아래에서 시작').toBeGreaterThanOrEqual(t.y + t.height - 1);
   expect(l.y + l.height, '목록이 화면 안에').toBeLessThanOrEqual(page.viewportSize()!.height);
   await expect(page.getByRole('option', { selected: true })).toBeInViewport();
   await page.keyboard.press('Escape');
@@ -200,9 +196,8 @@ test.describe('시간 선택', () => {
     });
     const me = await seed.student('김하늘', '010-1111-1111');
     await enterAsStudent(page, me);
-    await page.goto(`/student/rooms?apply=${room.id}`);
-    const dialog = page.getByRole('dialog', { name: 'A 자습실 방문 신청' });
-    await expectOpensBelow(page, dialog.getByRole('combobox', { name: '방문 시작 시각' }));
-    await expectOpensBelow(page, dialog.getByRole('combobox', { name: '방문 종료 시각' }));
+    await page.goto(`/student/rooms/${room.id}`);
+    await expectOpensBelow(page, page.getByRole('combobox', { name: '방문 시작 시각' }));
+    await expectOpensBelow(page, page.getByRole('combobox', { name: '방문 종료 시각' }));
   });
 });
