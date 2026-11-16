@@ -25,7 +25,7 @@ import { errorMessage } from '@/utils/errorMessage';
 import { hasAvailableSlot } from '@/utils/visitSlots';
 import PageShell from '@/components/layout/PageShell.vue';
 import AlternativeRoomsDialog from '@/components/domain/AlternativeRoomsDialog.vue';
-import VisitFormDialog from '@/components/domain/VisitFormDialog.vue';
+import VisitFormDialog, { type FullRoomEvent } from '@/components/domain/VisitFormDialog.vue';
 import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppSkeleton from '@/components/ui/AppSkeleton.vue';
@@ -99,16 +99,16 @@ function visitText(v: Pick<Visit, 'startAt' | 'endAt'>) {
 
 const isStarted = (v: Visit) => new Date(v.startAt).getTime() <= Date.now();
 
-/** 취소한 방문을 다시 신청할 수 있는 자습실 (삭제·종료·마감·이미 신청함이면 null) */
+/** 취소한 방문을 다시 신청할 수 있는 자습실 (삭제·종료·남은 시간에 빈 좌석 없음·이미 신청함이면 null) */
 function reapplyRoom(v: Visit): StudyRoom | null {
   if (v.studyRoom.deleted || myVisits.activeByRoom.has(v.studyRoom.id)) return null;
   const room = page.data.value?.find((r) => r.id === v.studyRoom.id);
   if (!room || getRoomPhase(room) === 'ended') return null;
-  if (room.currentPersonnel >= room.maxPersonnel || !hasAvailableSlot(room)) return null;
+  if (!room.hasFreeSlot || !hasAvailableSlot(room)) return null;
   return room;
 }
 
-// 다시 신청이 정원 마감으로 거절되면 같은 시간에 자리가 남은 자습실 안내 (#35)
+// 다시 신청할 시간에 빈 좌석이 없으면 같은 시간에 빈 좌석이 있는 자습실 안내 (#35, #49)
 const full = useFullRoomFallback(() => page.data.value, refresh);
 
 // 시간 변경 (?edit=visitId) · 다시 신청 (?apply=roomId)
@@ -133,6 +133,9 @@ const applyOpen = computed({
   get: () => !!applyingRoom.value,
   set: (v: boolean) => !v && applyDialog.close(),
 });
+async function onFull(event: FullRoomEvent) {
+  if (await full.onFull(event)) applyDialog.close();
+}
 
 function onSaved(visit: Visit, mode: 'apply' | 'update') {
   if (mode === 'apply') {
@@ -238,7 +241,8 @@ async function confirmCancel() {
           </div>
 
           <p class="text-caption text-fg-muted tabular-nums">
-            신청 {{ formatDate(visit.createdAt) }}
+            <template v-if="visit.seat">{{ visit.seat.number }}번 좌석 · </template>신청
+            {{ formatDate(visit.createdAt) }}
             <template v-if="visit.status === 'CANCELED' && visit.canceledAt">
               · 취소 {{ formatDate(visit.canceledAt) }}
               <template v-if="visit.studyRoom.deleted">
@@ -287,12 +291,9 @@ async function confirmCancel() {
     <VisitFormDialog
       v-model:open="applyOpen"
       :room="applyingRoom"
-      :remaining="
-        applyingRoom ? applyingRoom.maxPersonnel - applyingRoom.currentPersonnel : undefined
-      "
       @saved="onSaved"
       @stale="refresh"
-      @full="full.onFull"
+      @full="onFull"
     />
     <AlternativeRoomsDialog
       v-if="full.fallback.value"
