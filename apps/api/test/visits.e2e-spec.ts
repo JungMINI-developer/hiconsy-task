@@ -465,6 +465,69 @@ describe('Visits (e2e)', () => {
       );
     });
 
+    describe('정원 마지막 1자리', () => {
+      async function applied(roomId: number) {
+        return prisma.visit.count({ where: { studyRoomId: roomId, status: 'APPLIED' } });
+      }
+
+      it('20명이 동시에 신청해도 1명만 성공하고 나머지는 CAPACITY_FULL', async () => {
+        const roomId = await createRoom({ maxPersonnel: 5 });
+        for (let i = 0; i < 4; i += 1) await applyOk(await createStudent(), roomId);
+        const students = await Promise.all(Array.from({ length: 20 }, () => createStudent()));
+
+        const results = await Promise.all(students.map((id) => apply(id, roomId)));
+
+        expect(results.filter((res) => res.status === 201)).toHaveLength(1);
+        expect(
+          results.filter((res) => res.status !== 201).map((res) => res.body.error.code),
+        ).toEqual(Array(19).fill('CAPACITY_FULL'));
+        expect(await applied(roomId)).toBe(5);
+        // 거절된 신청은 이력도 남지 않는다 (먼저 신청한 4건 + 성공 1건)
+        expect(await prisma.visitHistory.count({ where: { studyRoomId: roomId } })).toBe(5);
+      });
+
+      it('재신청(취소했던 학생)과 신규 신청이 동시에 와도 1건만 성공한다', async () => {
+        const roomId = await createRoom({ maxPersonnel: 2 });
+        const [a, b, c, d] = await Promise.all(Array.from({ length: 4 }, () => createStudent()));
+        await applyOk(a, roomId);
+        const visitB = await applyOk(b, roomId);
+        await api().post(`/api/students/${b}/visits/${visitB}/cancel`).expect(200); // 남은 자리 1
+
+        const results = await Promise.all([b, c, d].map((id) => apply(id, roomId)));
+
+        expect(results.filter((res) => res.status === 201)).toHaveLength(1);
+        expect(
+          results.filter((res) => res.status !== 201).map((res) => res.body.error.code),
+        ).toEqual(['CAPACITY_FULL', 'CAPACITY_FULL']);
+        expect(await applied(roomId)).toBe(2);
+      });
+
+      it('정원이 찬 자습실에서 취소와 신규 신청이 동시에 와도 정원을 넘지 않는다', async () => {
+        // 어느 쪽이 먼저 락을 잡느냐에 따라 결과가 갈리므로 여러 번 반복한다
+        for (let i = 0; i < 10; i += 1) {
+          await resetDatabase(prisma);
+          const roomId = await createRoom({ maxPersonnel: 1 });
+          const [a, b] = [await createStudent(), await createStudent()];
+          const visitA = await applyOk(a, roomId);
+
+          const [cancel, applyB] = await Promise.all([
+            api().post(`/api/students/${a}/visits/${visitA}/cancel`),
+            apply(b, roomId),
+          ]);
+
+          expect(cancel.status).toBe(200);
+          if (applyB.status === 201) {
+            // 취소가 먼저 커밋됨 → 비워진 자리를 B가 차지
+            expect(await applied(roomId)).toBe(1);
+          } else {
+            // 신청이 먼저 락을 잡음 → 아직 꽉 차 있어 거절, 그 뒤 취소로 0명
+            expect(applyB.body.error.code).toBe('CAPACITY_FULL');
+            expect(await applied(roomId)).toBe(0);
+          }
+        }
+      });
+    });
+
     it('같은 학생이 같은 자습실에 동시에 여러 번 신청해도 1건만 성공한다', async () => {
       const studentId = await createStudent();
       const roomId = await createRoom({ maxPersonnel: 10 });

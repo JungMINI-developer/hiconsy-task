@@ -145,7 +145,7 @@ stateDiagram-v2
 3. 유효 신청 수를 세고 정원 검사 후 `visits`·`visit_histories` 저장
 4. 커밋 (락 해제)
 
-락 범위가 "자습실 1행"이라 다른 자습실 신청은 막지 않는다. 현재 인원을 `study_rooms`에 카운터 컬럼으로 두는 방법도 있지만, 상태와 카운터가 어긋날 위험이 있어 `visits(study_room_id, status)` 인덱스로 매번 세는 쪽을 택했다. 실제 락 적용은 방문 신청 API 구현에서 한다.
+락 범위가 "자습실 1행"이라 다른 자습실 신청은 막지 않는다. 현재 인원을 `study_rooms`에 카운터 컬럼으로 두는 방법도 있지만, 상태와 카운터가 어긋날 위험이 있어 `visits(study_room_id, status)` 인덱스로 매번 세는 쪽을 택했다. 락은 `lockStudyRoom()`(`apps/api/src/study-rooms/study-room-lock.ts`)으로 신청·재신청·시간 수정·취소와 자습실 수정·삭제에 적용되어 있다. 다른 방법과의 비교, 락 유무 비교 결과, 공정성(누가 이기는가)은 [solutions/study-room-capacity-concurrency.md](./solutions/study-room-capacity-concurrency.md)에 정리했다.
 
 #### 같은 학생의 시간 겹침 방지
 

@@ -111,13 +111,18 @@ prisma/
 - 락은 항상 학생 → 자습실 순서로 잡아 교착 상태를 피한다.
 
 e2e 테스트로 검증한다 (`test/visits.e2e-spec.ts`의 "동시성").
-시간 겹침 방지의 락 모드 선택 근거와 동시 요청 비교 결과는 [solutions/visit-time-overlap-concurrency.md](./solutions/visit-time-overlap-concurrency.md)에 정리했다.
 
-- 정원 3명 자습실에 10명이 동시에 신청하면 정확히 3명만 성공한다. 락을 빼고 실행하면 9명이 성공해 테스트가 실패하는 것을 확인했다.
+- 정원 3명 자습실에 10명이 동시에 신청하면 정확히 3명만 성공한다. 자습실 락을 빼고 실행하면 10명 전원이 성공해 테스트가 실패하는 것을 확인했다.
+- 정원이 1자리 남은 자습실에 20명이 동시에 신청하면 1명만 성공한다. 남은 자리가 2·3개일 때도 그 수만큼만 성공한다(시연으로 확인). 재신청과 신규 신청이 섞여도 1건만 성공하고, 취소와 신청이 동시에 와도 어느 순서든 정원을 넘지 않는다.
 - 같은 학생의 동시 중복 신청은 1건만 성공한다.
 - 정원 축소와 신청이 동시에 들어와도 정원을 넘지 않는다.
 - 같은 학생이 5개 자습실에 같은 시간으로 동시에 신청하면 1건만 성공한다. 학생 락을 `FOR SHARE`로 낮추면 여러 건이 성공해 테스트가 실패하는 것을 확인했다.
 - 시간 수정과 그 자습실 삭제가 동시에 들어와도 교착 상태 없이 처리된다. 학생 락을 `FOR UPDATE`로 올리면 PostgreSQL이 `deadlock detected`로 한쪽을 중단시켜 테스트가 실패하는 것을 확인했다.
+
+문제별 상세(대안 비교, 락 유무 비교 결과, 재현 방법)는 솔루션 문서에 정리했다.
+
+- 정원 마감 직전(남은 자리 1~3) 동시 신청, 공정성: [solutions/study-room-capacity-concurrency.md](./solutions/study-room-capacity-concurrency.md)
+- 같은 학생의 시간 겹침, 학생 락 모드 선택: [solutions/visit-time-overlap-concurrency.md](./solutions/visit-time-overlap-concurrency.md)
 
 ### `apps/web` (Vue 3)
 
