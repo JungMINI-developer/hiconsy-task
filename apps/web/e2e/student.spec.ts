@@ -130,8 +130,16 @@ test.describe('학생 · 방문 신청', () => {
     );
     await expectNoHorizontalScroll(page);
 
-    // 강사 이력: "퇴실" + 원래 시간 → 앞당긴 시간
+    // 강사 상세의 "지금" 칸은 실제 현재 시각 기준 — 방금 퇴실한 3번 좌석은 비어 있다 (#69)
     await enterAsTeacher(page);
+    await page.goto(`/teacher/rooms/${room.id}`);
+    await expect(page.getByText(/지금\(\d{2}:\d{2}\) 기준/)).toBeVisible();
+    await expect(page.getByTestId('seat-summary').getByRole('definition').first()).toHaveText('0');
+    await expect(
+      page.getByRole('list', { name: '좌석 배치도' }).locator('[data-seat="3"]'),
+    ).toHaveAccessibleName('3번 좌석, 비어 있음');
+
+    // 강사 이력: "퇴실" + 원래 시간 → 앞당긴 시간
     await page.goto(`/teacher/rooms/${room.id}?tab=histories`);
     const checkout = page
       .getByRole('region', { name: '이력' })
