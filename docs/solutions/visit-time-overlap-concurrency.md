@@ -1,6 +1,8 @@
 # 같은 학생의 방문 시간 겹침과 동시 요청 처리
 
 > 관련: 이슈 #31, PR #32 · 규칙 [requirements.md 9절 #13](../requirements.md#결정한-규칙)
+>
+> 이 문서의 "정원"은 작성 당시(자습실 단위 정원) 기준이다. #45 이후 정원 검사는 "같은 좌석의 시간 겹침"(`SEAT_TAKEN`)이 되었고, 검사 순서는 `ALREADY_APPLIED` → `VISIT_TIME_OVERLAP` → `SEAT_TAKEN`이다. 학생 행 락과 락 순서는 바뀌지 않았다. → [seat-reservation-concurrency.md](./seat-reservation-concurrency.md)
 
 ## 1. 문제
 

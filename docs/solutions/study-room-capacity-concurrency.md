@@ -1,6 +1,8 @@
 # 정원 마감 직전의 동시 신청 처리
 
 > 관련: 이슈 #33 · 규칙 [requirements.md 2절 정원, 9절 #2·#5](../requirements.md) · 같은 형식의 문서: [visit-time-overlap-concurrency.md](./visit-time-overlap-concurrency.md)
+>
+> **좌석 전환 전 모델의 기록이다.** 이 문서의 정원은 "자습실별 유효 신청 수 ≤ 최대 인원"이다. #45에서 정원을 "같은 좌석의 시간 겹침 금지"로 바꿨고, 자습실 행 락은 그대로 쓴다. 지금 규칙의 동시성은 [seat-reservation-concurrency.md](./seat-reservation-concurrency.md)를 본다. 락 대안 비교와 공정성(5절) 논의는 지금도 유효하다.
 
 ## 1. 문제
 
