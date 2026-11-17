@@ -81,23 +81,42 @@ const seatMap = useAsync((at: number) =>
 );
 const seats = computed<SeatOccupancy[]>(() => seatMap.data.value ?? []);
 
+/** 자동 갱신마다 새로 잡는 현재 시각 — "지금" 칸이 어느 30분인지와 실시간 조회 시각에 쓴다 */
+const nowTick = ref(Date.now());
+/** 지금이 속한 30분 칸 (운영 시간이 아니면 null) */
+const nowTime = computed(() =>
+  room.value ? nowSeatMapTime(room.value, new Date(nowTick.value)) : null,
+);
+/**
+ * "지금" 칸을 보고 있으면 실제 현재 시각으로 본다 (#69).
+ * 퇴실(#66)은 아무 시각에나 끝나므로, 30분 단위 시각(20:00)으로 보면 20:05에 나간 학생이 남아 보인다.
+ */
+const live = computed(() => viewTime.value !== null && viewTime.value === nowTime.value);
+/** 배치도·요약·"이용 중" 표시가 기준으로 삼는 시각 */
+const effectiveAt = computed(() => (live.value ? nowTick.value : viewTime.value));
+
 const timeOptions = computed(() =>
   room.value
-    ? seatMapTimes(room.value).map((t) => ({
-        value: t,
-        label: multiDay.value ? formatDateTime(new Date(t)) : formatTime(new Date(t)),
-      }))
+    ? seatMapTimes(room.value).map((t) => {
+        const label = multiDay.value ? formatDateTime(new Date(t)) : formatTime(new Date(t));
+        return { value: t, label: t === nowTime.value ? `${label} (지금)` : label };
+      })
     : [],
 );
 const timeIndex = computed(() => timeOptions.value.findIndex((o) => o.value === viewTime.value));
-const nowTime = computed(() => (room.value ? nowSeatMapTime(room.value) : null));
+
+function loadSeatMap() {
+  if (viewTime.value === null) return Promise.resolve(undefined);
+  if (live.value) nowTick.value = Date.now();
+  return seatMap.run(effectiveAt.value!);
+}
 
 // 처음 한 번만 기본값을 정한다. 이후 자동 갱신으로 바꾸지 않는다 (보고 있는 시점이 갑자기 바뀌지 않게)
 watch(room, (r) => {
   if (r && viewTime.value === null) viewTime.value = defaultSeatMapTime(r);
 });
-watch(viewTime, (t) => {
-  if (t !== null) void seatMap.run(t);
+watch(viewTime, () => {
+  void loadSeatMap();
 });
 
 function stepTime(delta: -1 | 1) {
@@ -109,7 +128,7 @@ function stepTime(delta: -1 | 1) {
 function setTime(t: number) {
   viewTime.value = t;
   const v = highlightedVisit.value;
-  if (v && !isSeatedAt(v, t)) highlightedVisitId.value = null;
+  if (v && !isSeatedAt(v, effectiveAt.value!)) highlightedVisitId.value = null;
 }
 
 // ── 요약 숫자 (#51 결정 2) — 고른 시각 기준. 예약 건수는 좌석 수보다 많을 수 있어 빼고 신청 학생 수로 보여준다
@@ -133,7 +152,8 @@ const highlightedSeatId = computed(
 );
 const announcement = ref('');
 
-const seatedNow = (a: StudyRoomVisit) => viewTime.value !== null && isSeatedAt(a, viewTime.value);
+const seatedNow = (a: StudyRoomVisit) =>
+  effectiveAt.value !== null && isSeatedAt(a, effectiveAt.value);
 
 async function toggleHighlight(a: StudyRoomVisit) {
   if (highlightedVisitId.value === a.id) {
@@ -201,9 +221,9 @@ const visibleHistories = computed(() =>
 
 // ── 최신화: 진입·창이 다시 보일 때 + 30초마다 (보는 동안 학생이 신청할 수 있다) ──
 function refresh() {
-  const tasks: Promise<unknown>[] = [detail.run()];
-  if (viewTime.value !== null) tasks.push(seatMap.run(viewTime.value));
-  return Promise.all(tasks);
+  // "지금" 칸을 보는 중이면 갱신할 때마다 현재 시각을 따라간다
+  if (live.value) nowTick.value = Date.now();
+  return Promise.all([detail.run(), loadSeatMap()]);
 }
 useRefetchOnVisible(refresh);
 useAutoRefresh(refresh);
@@ -309,7 +329,8 @@ async function confirmDelete() {
             </div>
           </dl>
           <p v-if="viewTime !== null" class="mt-2 text-center text-caption text-fg-muted">
-            {{ formatTime(new Date(viewTime)) }} 기준
+            <template v-if="live">지금({{ formatTime(new Date(nowTick)) }}) 기준</template>
+            <template v-else>{{ formatTime(new Date(viewTime)) }} 기준</template>
           </p>
         </div>
 
@@ -444,7 +465,7 @@ async function confirmDelete() {
             v-else-if="seatMap.status.value === 'error' && !seatMap.data.value"
             title="좌석 현황을 불러오지 못했어요"
             :description="errorMessage(seatMap.error.value)"
-            @retry="viewTime !== null && seatMap.run(viewTime)"
+            @retry="loadSeatMap()"
           />
           <SeatMapGrid
             v-else-if="seatMap.data.value"
