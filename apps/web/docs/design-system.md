@@ -33,9 +33,9 @@ OKLCH로 정의합니다. 라이트 모드만 MVP 범위이고, 다크 모드는
 
 | `@theme` 변수             | 클래스 예                                  | 의미                  | 사용처                       |
 | ------------------------- | ------------------------------------------ | --------------------- | ---------------------------- |
-| `--color-status-open`     | `bg-status-open`                           | 신청 가능 / 운영 중   | 배지, CapacityBar 기본       |
-| `--color-status-warn`     | `bg-status-warn`                           | 정원 80% 이상         | CapacityBar                  |
-| `--color-status-full`     | `bg-status-full`                           | 정원 마감             | 배지, CapacityBar 100%       |
+| `--color-status-open`     | `bg-status-open`                           | 신청 가능 / 운영 중   | 배지                         |
+| `--color-status-warn`     | `bg-status-warn`                           | 주의                  | 이력 변경 점                 |
+| `--color-status-full`     | `bg-status-full`                           | 정원 마감             | 배지                         |
 | `--color-status-applied`  | `bg-status-applied/10 text-status-applied` | 신청됨 (내 신청)      | 배지 — accent와 같은 계열    |
 | `--color-status-canceled` | `text-status-canceled`                     | 취소됨                | 배지 (무채색, 텍스트로 구분) |
 | `--color-status-ended`    | `text-status-ended`                        | 운영 종료 / 지난 방문 | 배지 (무채색)                |
@@ -156,13 +156,14 @@ OKLCH로 정의합니다. 라이트 모드만 MVP 범위이고, 다크 모드는
 
 ### `components/domain` — 도메인 전용
 
-| 컴포넌트           | 화면             | 설명                                               |
-| ------------------ | ---------------- | -------------------------------------------------- |
-| `StudyRoomCard`    | S-10, S-20       | `variant: 'teacher' \| 'student'`로 정보·액션 분기 |
-| `CapacityBar`      | S-10, S-11, S-20 | 신청/정원 막대 + 숫자, 80%·100% 상태색             |
-| `PeriodText`       | 전역             | 운영 기간·방문 시간 포맷 (같은 날이면 날짜 생략)   |
-| `VisitStatusBadge` | S-20, S-21       | 신청됨·취소됨·지난 방문                            |
-| `HistoryTimeline`  | S-11, S-21       | `VisitHistory` 목록 → 시간순 타임라인              |
-| `StudyRoomForm`    | S-12             | 등록·수정 공용                                     |
-| `VisitForm`        | S-22             | 신청·수정 공용, 운영 기간 기반 선택지 생성         |
-| `RoleSwitcher`     | 헤더             | 현재 역할·이름 + 역할 바꾸기                       |
+| 컴포넌트           | 화면       | 설명                                               |
+| ------------------ | ---------- | -------------------------------------------------- |
+| `StudyRoomCard`    | S-10, S-20 | `variant: 'teacher' \| 'student'`로 정보·액션 분기 |
+| `SeatGrid`         | S-22       | 학생 좌석 고르기 (라디오 그룹, 한 줄 5석)          |
+| `SeatMapGrid`      | S-11       | 강사 시각별 좌석 배치도 (보기 전용, 학생 이름)     |
+| `PeriodText`       | 전역       | 운영 기간·방문 시간 포맷 (같은 날이면 날짜 생략)   |
+| `VisitStatusBadge` | S-20, S-21 | 신청됨·취소됨·지난 방문                            |
+| `HistoryTimeline`  | S-11, S-21 | `VisitHistory` 목록 → 시간순 타임라인              |
+| `StudyRoomForm`    | S-12       | 등록·수정 공용                                     |
+| `VisitForm`        | S-22       | 신청·수정 공용, 운영 기간 기반 선택지 생성         |
+| `RoleSwitcher`     | 헤더       | 현재 역할·이름 + 역할 바꾸기                       |

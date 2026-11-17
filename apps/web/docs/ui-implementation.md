@@ -42,7 +42,7 @@ src/
     main.css          # @import 'tailwindcss' + @theme 토큰 + @layer base (main.ts에서 import)
   components/
     ui/               # 범용 컴포넌트 (Reka UI 래핑 포함) — 도메인 import 금지
-    domain/           # StudyRoomCard, CapacityBar, HistoryTimeline ...
+    domain/           # StudyRoomCard, SeatGrid, SeatMapGrid, HistoryTimeline ...
     layout/           # AppHeader, RoleSwitcher, PageShell
   views/
     RoleSelectView.vue
