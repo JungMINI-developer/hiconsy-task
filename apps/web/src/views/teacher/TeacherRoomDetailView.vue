@@ -193,6 +193,7 @@ const filterOptions = [
   { value: 'APPLY' as const, label: '신청' },
   { value: 'UPDATE' as const, label: '변경' },
   { value: 'CANCEL' as const, label: '취소' },
+  { value: 'CHECKOUT' as const, label: '퇴실' },
 ];
 const visibleHistories = computed(() =>
   filterHistories(histories.value, historyFilter.value, studentQuery.value),

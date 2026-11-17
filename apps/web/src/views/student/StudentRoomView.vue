@@ -14,7 +14,8 @@ import { useStudentGuard } from '@/composables/useStudentGuard';
 import { useToast } from '@/composables/useToast';
 import { useVisitTimePicker } from '@/composables/useVisitTimePicker';
 import { useVisitToast } from '@/composables/useVisitToast';
-import { isVisitEditable, useMyVisitsStore } from '@/stores/myVisits';
+import { isVisitEditable, isVisitInProgress, useMyVisitsStore } from '@/stores/myVisits';
+import { useVisitCheckout } from '@/composables/useVisitCheckout';
 import { useSessionStore } from '@/stores/session';
 import {
   formatDate,
@@ -34,6 +35,7 @@ import SeatGrid from '@/components/domain/SeatGrid.vue';
 import VisitTimeFields from '@/components/domain/VisitTimeFields.vue';
 import AppAlert from '@/components/ui/AppAlert.vue';
 import AppButton from '@/components/ui/AppButton.vue';
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
 import AppSkeleton from '@/components/ui/AppSkeleton.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
@@ -112,6 +114,9 @@ async function refresh() {
   await page.run();
   if (page.error.value) handleStudentGone(page.error.value);
 }
+
+// 퇴실 (#66) — 진행 중인 내 방문은 시간·좌석 변경 대신 퇴실
+const checkout = useVisitCheckout(() => refresh());
 // 다른 자습실 안내(S-23)에서 다른 자습실로 옮기면 같은 화면을 다시 쓴다 → 새로 불러온다
 watch(
   () => props.id,
@@ -494,6 +499,15 @@ function handleSaveError(e: unknown) {
               변경하기
             </AppButton>
           </div>
+          <AppButton
+            v-else-if="myVisit && isVisitInProgress(myVisit)"
+            variant="secondary"
+            size="lg"
+            class="w-full sm:w-auto"
+            @click="checkout.target.value = myVisit"
+          >
+            퇴실
+          </AppButton>
           <div v-else-if="myVisit" class="flex w-full gap-2 sm:w-auto">
             <AppButton
               variant="secondary"
@@ -536,6 +550,14 @@ function handleSaveError(e: unknown) {
       :range="full.fallback.value.range"
       :rooms="full.fallback.value.rooms"
       @pick="full.pick"
+    />
+    <ConfirmDialog
+      v-model:open="checkout.open.value"
+      title="지금 퇴실할까요?"
+      :description="checkout.description.value"
+      confirm-label="퇴실"
+      :loading="checkout.busy.value"
+      @confirm="checkout.confirm"
     />
   </PageShell>
 </template>
