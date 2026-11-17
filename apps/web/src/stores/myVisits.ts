@@ -12,6 +12,16 @@ export function visitGroup(visit: Visit, now: Date = new Date()): VisitGroup {
   return new Date(visit.endAt).getTime() > now.getTime() ? 'upcoming' : 'past';
 }
 
+/** 진행 중인 방문 (시작 < 지금 < 종료) — 수정·취소 대신 퇴실할 수 있다 (requirements 9절 #16, #66) */
+export function isVisitInProgress(visit: Visit, now: Date = new Date()): boolean {
+  const t = now.getTime();
+  return (
+    visit.status === 'APPLIED' &&
+    new Date(visit.startAt).getTime() < t &&
+    t < new Date(visit.endAt).getTime()
+  );
+}
+
 /** 이미 시작한 방문은 수정·취소할 수 없다 (requirements 9절 #12) */
 export function isVisitEditable(visit: Visit, now: Date = new Date()): boolean {
   return visit.status === 'APPLIED' && new Date(visit.startAt).getTime() > now.getTime();

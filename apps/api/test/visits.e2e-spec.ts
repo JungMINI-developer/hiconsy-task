@@ -405,6 +405,100 @@ describe('Visits (e2e)', () => {
     });
   });
 
+  describe('POST /api/students/:studentId/visits/:visitId/checkout (조기 퇴실, #66)', () => {
+    const HOUR = 60 * 60 * 1000;
+    const SLOT_MS = 30 * 60 * 1000;
+
+    /** 신청을 만든 뒤 자습실·방문 시각을 옮겨 "진행 중"(또는 원하는 시점)으로 만든다 */
+    async function visitAround(studentId: number, startOffsetH: number, endOffsetH: number) {
+      const roomId = await createRoom();
+      const visitId = await applyOk(studentId, roomId);
+      const now = Date.now();
+      await prisma.studyRoom.update({
+        where: { id: roomId },
+        data: { startDate: new Date(now - 5 * HOUR), endDate: new Date(now + 5 * HOUR) },
+      });
+      await prisma.visit.update({
+        where: { id: visitId },
+        data: {
+          startAt: new Date(now + startOffsetH * HOUR),
+          endAt: new Date(now + endOffsetH * HOUR),
+        },
+      });
+      return { roomId, visitId };
+    }
+
+    const checkout = (studentId: number, visitId: number) =>
+      api().post(`/api/students/${studentId}/visits/${visitId}/checkout`);
+
+    it('진행 중인 방문의 종료를 지금으로 줄이고, 남은 시간의 좌석은 다른 학생이 쓸 수 있다', async () => {
+      const me = await createStudent('나');
+      const other = await createStudent('다른 학생');
+      const { roomId, visitId } = await visitAround(me, -1, 2);
+      const before = await prisma.visit.findUniqueOrThrow({ where: { id: visitId } });
+
+      const res = await checkout(me, visitId).expect(200);
+      const endAt = new Date(res.body.data.endAt).getTime();
+      expect(Math.abs(endAt - Date.now())).toBeLessThan(10_000);
+      expect(res.body.data.status).toBe('APPLIED');
+      expect(new Date(res.body.data.startAt).getTime()).toBe(before.startAt.getTime());
+
+      const rows = await prisma.visitHistory.findMany({
+        where: { visitId },
+        orderBy: { id: 'asc' },
+      });
+      expect(rows.map((r) => `${r.action}:${r.actorType}`)).toEqual([
+        'APPLY:STUDENT',
+        'CHECKOUT:STUDENT',
+      ]);
+      expect(rows[1]!.prevEndAt!.getTime()).toBe(before.endAt.getTime());
+      expect(rows[1]!.endAt.getTime()).toBe(endAt);
+      expect(rows[1]!.seatId).toBe(before.seatId);
+
+      // 원래는 2시간 뒤까지 예약돼 있던 좌석을 다음 30분부터 다른 학생이 고를 수 있다
+      const start = Math.ceil((Date.now() + 1000) / SLOT_MS) * SLOT_MS;
+      await api()
+        .post(`/api/students/${other}/visits`)
+        .send({
+          studyRoomId: roomId,
+          seatId: before.seatId,
+          startAt: new Date(start).toISOString(),
+          endAt: new Date(start + SLOT_MS).toISOString(),
+        })
+        .expect(201);
+    });
+
+    it('시작 전이면 VISIT_NOT_STARTED, 끝났으면 VISIT_ALREADY_ENDED', async () => {
+      const me = await createStudent();
+      const upcoming = await visitAround(me, 1, 2);
+      expect((await checkout(me, upcoming.visitId).expect(409)).body.error.code).toBe(
+        'VISIT_NOT_STARTED',
+      );
+
+      const other = await createStudent();
+      const ended = await visitAround(other, -3, -1);
+      expect((await checkout(other, ended.visitId).expect(409)).body.error.code).toBe(
+        'VISIT_ALREADY_ENDED',
+      );
+    });
+
+    it('취소한 신청은 VISIT_ALREADY_CANCELED, 다른 학생의 신청은 404', async () => {
+      const me = await createStudent();
+      const roomId = await createRoom();
+      const visitId = await applyOk(me, roomId);
+      await api().post(`/api/students/${me}/visits/${visitId}/cancel`).expect(200);
+      expect((await checkout(me, visitId).expect(409)).body.error.code).toBe(
+        'VISIT_ALREADY_CANCELED',
+      );
+
+      const stranger = await createStudent();
+      const mine = await visitAround(await createStudent(), -1, 1);
+      expect((await checkout(stranger, mine.visitId).expect(404)).body.error.code).toBe(
+        'VISIT_NOT_FOUND',
+      );
+    });
+  });
+
   describe('GET /api/students/:studentId/visits (내 신청 목록)', () => {
     it('본인 신청만, 취소 포함, 방문 시작 순으로 준다', async () => {
       const me = await createStudent();

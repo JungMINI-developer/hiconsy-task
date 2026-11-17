@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Visit } from '@hiconsy/shared';
-import { isVisitEditable, visitGroup } from '../myVisits';
+import { isVisitEditable, isVisitInProgress, visitGroup } from '../myVisits';
 
 const now = new Date('2026-11-20T19:00:00+09:00');
 
@@ -48,6 +48,36 @@ describe('myVisits 규칙', () => {
     expect(
       isVisitEditable(
         visit('CANCELED', '2026-11-21T19:00:00+09:00', '2026-11-21T21:00:00+09:00'),
+        now,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('isVisitInProgress (#66 퇴실)', () => {
+  it('시작 < 지금 < 종료인 유효 신청만 진행 중', () => {
+    expect(
+      isVisitInProgress(
+        visit('APPLIED', '2026-11-20T18:00:00+09:00', '2026-11-20T20:00:00+09:00'),
+        now,
+      ),
+    ).toBe(true);
+    // 시작과 같은 시각은 아직 시작 전 (퇴실하면 구간이 비므로)
+    expect(
+      isVisitInProgress(
+        visit('APPLIED', '2026-11-20T19:00:00+09:00', '2026-11-20T20:00:00+09:00'),
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      isVisitInProgress(
+        visit('APPLIED', '2026-11-20T17:00:00+09:00', '2026-11-20T19:00:00+09:00'),
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      isVisitInProgress(
+        visit('CANCELED', '2026-11-20T18:00:00+09:00', '2026-11-20T20:00:00+09:00'),
         now,
       ),
     ).toBe(false);

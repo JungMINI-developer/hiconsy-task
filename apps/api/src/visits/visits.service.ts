@@ -162,6 +162,42 @@ export class VisitsService {
   }
 
   /**
+   * 조기 퇴실 (#66, 규칙 #16). 진행 중인 방문(시작 < 지금 < 종료)의 종료 시각을 지금으로 줄여
+   * 남은 시간의 좌석을 다른 학생에게 돌려준다. 이미 지난 시간은 그대로이고, 상태는 APPLIED(다녀간 방문)로 남는다.
+   * 원래 시간은 CHECKOUT 이력의 이전 값으로 남긴다.
+   */
+  async checkout(studentId: number, visitId: number): Promise<Visit> {
+    return this.prisma.$transaction(async (tx) => {
+      // 종료를 앞당기기만 하므로 시간 겹침을 만들 수 없다 — 취소처럼 학생 삭제와만 직렬화한다
+      const { visit } = await this.lockOwnVisit(tx, studentId, visitId, 'share');
+      const now = new Date();
+      assertInProgress(visit, now);
+
+      const updated = await tx.visit.update({
+        where: { id: visit.id },
+        data: { endAt: now },
+        include: visitInclude,
+      });
+      await tx.visitHistory.create({
+        data: {
+          visitId: visit.id,
+          studentId,
+          studyRoomId: visit.studyRoomId,
+          action: 'CHECKOUT',
+          prevStartAt: visit.startAt,
+          prevEndAt: visit.endAt,
+          startAt: visit.startAt,
+          endAt: now,
+          prevSeatId: visit.seatId,
+          seatId: visit.seatId,
+          actorType: 'STUDENT',
+        },
+      });
+      return toVisit(updated);
+    });
+  }
+
+  /**
    * 본인 신청인지 확인하고 학생·자습실 락을 잡은 뒤, 락 이후 시점의 최신 값을 다시 읽는다.
    * 다른 학생의 신청은 존재 여부를 노출하지 않도록 404로 응답한다.
    */
@@ -182,6 +218,32 @@ export class VisitsService {
     });
     const room = await tx.studyRoom.findUniqueOrThrow({ where: { id: visit.studyRoomId } });
     return { visit, room };
+  }
+}
+
+/** 퇴실은 진행 중인 유효 신청만 — 시작 전이면 취소, 끝났으면 할 일이 없다 (#66) */
+function assertInProgress(visit: VisitRow, now: Date): void {
+  if (visit.status === 'CANCELED') {
+    throw new DomainException(
+      ErrorCode.VISIT_ALREADY_CANCELED,
+      '이미 취소된 신청입니다.',
+      HttpStatus.CONFLICT,
+    );
+  }
+  // 시작과 같은 시각이면 종료 = 시작이 되어 구간이 비므로 시작 전으로 본다
+  if (now.getTime() <= visit.startAt.getTime()) {
+    throw new DomainException(
+      ErrorCode.VISIT_NOT_STARTED,
+      '아직 시작하지 않은 방문입니다. 퇴실 대신 취소해 주세요.',
+      HttpStatus.CONFLICT,
+    );
+  }
+  if (now.getTime() >= visit.endAt.getTime()) {
+    throw new DomainException(
+      ErrorCode.VISIT_ALREADY_ENDED,
+      '이미 끝난 방문입니다.',
+      HttpStatus.CONFLICT,
+    );
   }
 }
 

@@ -83,4 +83,23 @@ export class VisitsController {
   ): Promise<Visit> {
     return this.visitsService.cancel(studentId, visitId);
   }
+
+  @Post(':visitId/checkout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      '조기 퇴실 (#66) — 진행 중인 방문의 종료 시각을 지금으로 줄여 남은 시간의 좌석을 돌려준다',
+  })
+  @ApiResponse({ status: 404, description: 'STUDENT_NOT_FOUND / VISIT_NOT_FOUND' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'VISIT_ALREADY_CANCELED / VISIT_NOT_STARTED: 시작 전(취소할 것) / VISIT_ALREADY_ENDED',
+  })
+  checkout(
+    @Param('studentId', ParseIntPipe) studentId: number,
+    @Param('visitId', ParseIntPipe) visitId: number,
+  ): Promise<Visit> {
+    return this.visitsService.checkout(studentId, visitId);
+  }
 }

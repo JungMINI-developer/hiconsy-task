@@ -12,4 +12,7 @@ export const visitsApi = {
     unwrap(apiClient.patch<ApiResponse<Visit>>(`${base(studentId)}/${visitId}`, body)),
   cancel: (studentId: number, visitId: number) =>
     unwrap(apiClient.post<ApiResponse<Visit>>(`${base(studentId)}/${visitId}/cancel`)),
+  /** 조기 퇴실 — 진행 중인 방문의 종료를 지금으로 줄인다 (#66) */
+  checkout: (studentId: number, visitId: number) =>
+    unwrap(apiClient.post<ApiResponse<Visit>>(`${base(studentId)}/${visitId}/checkout`)),
 };

@@ -18,7 +18,8 @@ export interface SeatRef {
   /** 자습실 안의 좌석 번호 (1부터) */
   number: number;
 }
-export type VisitAction = 'APPLY' | 'UPDATE' | 'CANCEL';
+/** CHECKOUT: 진행 중인 방문의 조기 퇴실 — 종료 시각을 퇴실 시각으로 줄인다 (#66) */
+export type VisitAction = 'APPLY' | 'UPDATE' | 'CANCEL' | 'CHECKOUT';
 export type ActorType = 'STUDENT' | 'INSTRUCTOR' | 'SYSTEM';
 
 /** 자습실 (목록·상세 공통) */
