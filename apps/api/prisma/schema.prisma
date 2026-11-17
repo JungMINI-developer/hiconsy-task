@@ -1,0 +1,146 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+  previewFeatures     = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// 방문 신청 상태. 취소 건은 정원 계산에서 제외된다.
+enum VisitStatus {
+  APPLIED
+  CANCELED
+}
+
+/// 이력 이벤트 종류
+enum VisitAction {
+  APPLY
+  UPDATE
+  CANCEL
+}
+
+/// 이력을 남긴 주체. SYSTEM은 자습실 변경·삭제로 인한 자동 처리(FR-ROM-06) 용도
+enum ActorType {
+  STUDENT
+  INSTRUCTOR
+  SYSTEM
+}
+
+/// 학생
+model Student {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(50)
+  phone     String    @db.VarChar(20)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  visits    Visit[]
+  histories VisitHistory[]
+
+  /// 삭제되지 않은 학생끼리만 전화번호 중복 불가 (삭제된 학생의 번호는 재등록 가능)
+  @@unique([phone], map: "students_phone_active_key", where: { deletedAt: null })
+  @@index([deletedAt])
+  @@map("students")
+}
+
+/// 자습실
+model StudyRoom {
+  id           Int       @id @default(autoincrement())
+  name         String    @db.VarChar(100)
+  maxPersonnel Int       @map("max_personnel")
+  startDate    DateTime  @map("start_date") @db.Timestamptz(3)
+  endDate      DateTime  @map("end_date") @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  visits    Visit[]
+  histories VisitHistory[]
+  seats     Seat[]
+
+  @@index([deletedAt, startDate])
+  @@map("study_rooms")
+}
+
+/// 좌석. 자습실의 최대 인원 = 좌석 수이고, 번호는 1부터 붙는다 (#45).
+/// 최대 인원을 줄여도 행을 지우지 않는다. `number > max_personnel`인 좌석은 쓰지 않는 좌석이며,
+/// 지난 신청·이력이 계속 참조할 수 있고 최대 인원을 다시 늘리면 같은 번호로 다시 쓴다.
+model Seat {
+  id          Int      @id @default(autoincrement())
+  studyRoomId Int      @map("study_room_id")
+  number      Int
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  studyRoom     StudyRoom      @relation(fields: [studyRoomId], references: [id], onDelete: Restrict)
+  visits        Visit[]
+  histories     VisitHistory[] @relation("HistorySeat")
+  prevHistories VisitHistory[] @relation("HistoryPrevSeat")
+
+  @@unique([studyRoomId, number])
+  @@map("seats")
+}
+
+/// 방문 신청 (현재 상태). 학생-자습실 쌍당 1행이며, 취소 후 재신청 시 같은 행을 APPLIED로 되돌린다.
+model Visit {
+  id          Int         @id @default(autoincrement())
+  studentId   Int         @map("student_id")
+  studyRoomId Int         @map("study_room_id")
+  startAt     DateTime    @map("start_at") @db.Timestamptz(3)
+  endAt       DateTime    @map("end_at") @db.Timestamptz(3)
+  /// 앉을 좌석. 유효 신청은 항상 있고(서비스 로직), 취소해도 남겨 재신청 때 기본으로 고른다.
+  /// 좌석 도입 전에 취소된 신청은 null
+  seatId      Int?        @map("seat_id")
+  status      VisitStatus @default(APPLIED)
+  canceledAt  DateTime?   @map("canceled_at") @db.Timestamptz(3)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  student   Student        @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  studyRoom StudyRoom      @relation(fields: [studyRoomId], references: [id], onDelete: Restrict)
+  seat      Seat?          @relation(fields: [seatId], references: [id], onDelete: Restrict)
+  histories VisitHistory[]
+
+  @@unique([studentId, studyRoomId])
+  @@index([studyRoomId, status])
+  /// 좌석별 시간 겹침 검사
+  @@index([seatId, status, startAt])
+  @@map("visits")
+}
+
+/// 방문 신청 이력 (append-only). 신청·수정·취소마다 1행씩 쌓이며 수정·삭제하지 않는다.
+model VisitHistory {
+  id          Int         @id @default(autoincrement())
+  visitId     Int         @map("visit_id")
+  /// 자습실별·학생별 이력 조회를 조인 없이 하기 위해 비정규화
+  studyRoomId Int         @map("study_room_id")
+  studentId   Int         @map("student_id")
+  action      VisitAction
+  /// 이벤트 이전 방문 구간 (APPLY는 null)
+  prevStartAt DateTime?   @map("prev_start_at") @db.Timestamptz(3)
+  prevEndAt   DateTime?   @map("prev_end_at") @db.Timestamptz(3)
+  /// 이벤트 이후 방문 구간
+  startAt     DateTime    @map("start_at") @db.Timestamptz(3)
+  endAt       DateTime    @map("end_at") @db.Timestamptz(3)
+  /// 이벤트 이전·이후 좌석 (좌석 도입 전 이력은 null)
+  prevSeatId  Int?        @map("prev_seat_id")
+  seatId      Int?        @map("seat_id")
+  actorType   ActorType   @default(STUDENT) @map("actor_type")
+  reason      String?     @db.VarChar(255)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  visit     Visit     @relation(fields: [visitId], references: [id], onDelete: Restrict)
+  studyRoom StudyRoom @relation(fields: [studyRoomId], references: [id], onDelete: Restrict)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  prevSeat  Seat?     @relation("HistoryPrevSeat", fields: [prevSeatId], references: [id], onDelete: Restrict)
+  seat      Seat?     @relation("HistorySeat", fields: [seatId], references: [id], onDelete: Restrict)
+
+  @@index([studyRoomId, createdAt])
+  @@index([studentId, createdAt])
+  @@index([visitId])
+  @@map("visit_histories")
+}

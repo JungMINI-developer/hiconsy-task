@@ -1,0 +1,45 @@
+name: 🐛 버그 리포트
+description: 버그 수정 작업
+title: '[Fix] '
+labels: ['bug']
+body:
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 범위
+      multiple: true
+      options:
+        - web
+        - api
+        - shared
+        - infra
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: 버그 설명
+      description: 어떤 문제가 발생하는지 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 재현 방법
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 동작
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 로그 / 스크린샷
+      render: shell

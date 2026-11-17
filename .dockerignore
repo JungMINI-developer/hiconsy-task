@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.turbo
+**/.env
+**/coverage
+**/.eslintcache
+apps/api/src/generated
+.git
+.husky
+.vscode

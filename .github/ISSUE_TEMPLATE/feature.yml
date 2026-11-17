@@ -1,0 +1,38 @@
+name: ✨ 기능 개발
+description: 새로운 기능 개발 작업
+title: '[Feat] '
+labels: ['feature']
+body:
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 범위
+      multiple: true
+      options:
+        - web
+        - api
+        - shared
+        - infra
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: 기능 설명
+      description: 어떤 기능을 왜 개발하는지 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: 작업 목록
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: 참고 사항
+      description: 설계 메모, API 스펙, 참고 링크 등
