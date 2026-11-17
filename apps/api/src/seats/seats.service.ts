@@ -8,6 +8,7 @@ import {
 import { toKstIso } from '../common/utils/date.js';
 import { DomainException } from '../common/exceptions/domain.exception.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { toStudentContact } from '../students/student.mapper.js';
 import { studyRoomNotFound } from '../study-rooms/study-room-lock.js';
 import type {
   SeatAvailabilityQueryDto,
@@ -51,7 +52,9 @@ export class SeatsService {
       include: {
         visits: {
           where: { status: 'APPLIED', startAt: { lte: at }, endAt: { gt: at } },
-          include: { student: { select: { id: true, name: true, phone: true } } },
+          include: {
+            student: { select: { id: true, name: true, phone: true, deletedAt: true } },
+          },
           take: 1,
         },
       },
@@ -65,7 +68,7 @@ export class SeatsService {
         visit: v
           ? {
               id: v.id,
-              student: v.student,
+              student: toStudentContact(v.student),
               startAt: toKstIso(v.startAt),
               endAt: toKstIso(v.endAt),
             }

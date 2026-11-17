@@ -155,7 +155,11 @@ export class StudyRoomsService {
 
     const histories = await this.prisma.visitHistory.findMany({
       where: { studyRoomId: id },
-      include: { student: { select: { id: true, name: true } }, prevSeat: true, seat: true },
+      include: {
+        student: { select: { id: true, name: true, deletedAt: true } },
+        prevSeat: true,
+        seat: true,
+      },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
     return histories.map(toStudyRoomHistory);
@@ -173,7 +177,7 @@ export class StudyRoomsService {
     const visits = await this.prisma.visit.findMany({
       where: { studyRoomId: id, status: 'APPLIED' },
       include: {
-        student: { select: { id: true, name: true, phone: true } },
+        student: { select: { id: true, name: true, phone: true, deletedAt: true } },
         seat: true,
         // 재신청이면 마지막 APPLY 시각을 신청 시각으로 쓴다
         histories: {

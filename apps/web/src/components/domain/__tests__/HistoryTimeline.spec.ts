@@ -6,7 +6,7 @@ import HistoryTimeline from '../HistoryTimeline.vue';
 const base: StudyRoomHistory = {
   id: 1,
   visitId: 1,
-  student: { id: 1, name: '김하늘' },
+  student: { id: 1, name: '김하늘', deletedAt: null },
   action: 'APPLY',
   prevStartAt: null,
   prevEndAt: null,

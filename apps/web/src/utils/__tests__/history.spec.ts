@@ -13,7 +13,7 @@ function h(
   return {
     id: ++seq,
     visitId,
-    student: { id: visitId, name },
+    student: { id: visitId, name, deletedAt: null },
     action,
     prevStartAt: null,
     prevEndAt: null,

@@ -177,6 +177,72 @@ describe('Students (e2e)', () => {
       expect(await prisma.visitHistory.count({ where: { visitId: past.id } })).toBe(0);
     });
 
+    it('탈퇴한 학생의 지난 방문은 강사 화면 응답에 deletedAt과 함께 남는다 (#61)', async () => {
+      const gone = await createStudent('탈퇴', '010-1111-1111');
+      const stay = await createStudent('재학', '010-2222-2222');
+      const hour = 60 * 60 * 1000;
+      const at = (h: number) => new Date(Date.now() + h * hour);
+      const room = await prisma.studyRoom.create({
+        data: {
+          name: 'A 자습실',
+          maxPersonnel: 2,
+          startDate: at(-48),
+          endDate: at(48),
+          seats: { create: [{ number: 1 }, { number: 2 }] },
+        },
+        include: { seats: { orderBy: { number: 'asc' } } },
+      });
+      for (const [studentId, seat] of [
+        [gone, room.seats[0]!],
+        [stay, room.seats[1]!],
+      ] as const) {
+        const visit = await prisma.visit.create({
+          data: {
+            studentId,
+            studyRoomId: room.id,
+            startAt: at(-30),
+            endAt: at(-28),
+            seatId: seat.id,
+          },
+        });
+        await prisma.visitHistory.create({
+          data: {
+            visitId: visit.id,
+            studentId,
+            studyRoomId: room.id,
+            action: 'APPLY',
+            startAt: visit.startAt,
+            endAt: visit.endAt,
+            seatId: seat.id,
+          },
+        });
+      }
+
+      await api().delete(`/api/students/${gone}`).expect(204);
+
+      type WithStudent = { student: { id: number; deletedAt: string | null } };
+      const byStudent = (items: WithStudent[]) =>
+        Object.fromEntries(items.map((i) => [i.student.id, i.student.deletedAt]));
+
+      const visits = (await api().get(`/api/study-rooms/${room.id}/visits`).expect(200)).body.data;
+      expect(byStudent(visits)).toEqual({ [gone]: expect.any(String), [stay]: null });
+
+      const histories = (await api().get(`/api/study-rooms/${room.id}/histories`).expect(200)).body
+        .data;
+      expect(byStudent(histories)).toEqual({ [gone]: expect.any(String), [stay]: null });
+
+      const seatMap = (
+        await api()
+          .get(`/api/study-rooms/${room.id}/seat-map`)
+          .query({ at: at(-29).toISOString() })
+          .expect(200)
+      ).body.data as { visit: WithStudent | null }[];
+      expect(byStudent(seatMap.map((s) => s.visit!))).toEqual({
+        [gone]: expect.any(String),
+        [stay]: null,
+      });
+    });
+
     it('이미 삭제된 학생은 STUDENT_NOT_FOUND', async () => {
       const id = await createStudent();
       await api().delete(`/api/students/${id}`).expect(204);
