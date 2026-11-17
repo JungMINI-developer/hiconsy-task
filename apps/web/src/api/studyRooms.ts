@@ -4,6 +4,7 @@ import type {
   IsoDateString,
   RoomFreeSeats,
   SeatAvailability,
+  SeatOccupancy,
   StudyRoom,
   StudyRoomHistory,
   StudyRoomVisit,
@@ -32,6 +33,13 @@ export const studyRoomsApi = {
     unwrap(
       apiClient.get<ApiResponse<SeatAvailability[]>>(`/study-rooms/${id}/seats`, {
         params: { ...range, ...(exceptVisitId !== undefined && { exceptVisitId }) },
+      }),
+    ),
+  /** 그 시각의 좌석 배치도 — 좌석마다 앉아 있기로 한 신청과 학생 연락처 (강사, S-11) */
+  seatMap: (id: number, at: IsoDateString) =>
+    unwrap(
+      apiClient.get<ApiResponse<SeatOccupancy[]>>(`/study-rooms/${id}/seat-map`, {
+        params: { at },
       }),
     ),
   /** 운영 기간이 그 시간을 포함하는 자습실마다 그 시간 내내 비어 있는 좌석 수 (S-23) */
