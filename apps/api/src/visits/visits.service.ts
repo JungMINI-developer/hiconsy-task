@@ -170,7 +170,9 @@ export class VisitsService {
     return this.prisma.$transaction(async (tx) => {
       // 종료를 앞당기기만 하므로 시간 겹침을 만들 수 없다 — 취소처럼 학생 삭제와만 직렬화한다
       const { visit } = await this.lockOwnVisit(tx, studentId, visitId, 'share');
-      const now = new Date();
+      // 초 단위로 내린다 (#69): 클라이언트는 시각을 초 단위로 보내므로(배치도 `at`), 밀리초가 남으면
+      // 퇴실 직후 같은 초에 조회한 "지금" 배치도에 방금 나간 학생이 남아 보인다
+      const now = new Date(Math.floor(Date.now() / 1000) * 1000);
       assertInProgress(visit, now);
 
       const updated = await tx.visit.update({
