@@ -21,6 +21,8 @@ enum VisitAction {
   APPLY
   UPDATE
   CANCEL
+  /// 진행 중인 방문의 조기 퇴실 — 종료 시각을 퇴실 시각으로 줄인다 (#66)
+  CHECKOUT
 }
 
 /// 이력을 남긴 주체. SYSTEM은 자습실 변경·삭제로 인한 자동 처리(FR-ROM-06) 용도

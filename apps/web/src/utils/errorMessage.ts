@@ -25,6 +25,8 @@ const MESSAGES: Record<string, string> = {
   [ErrorCode.SEATS_IN_USE]: '없어질 좌석에 예약이 있어 줄일 수 없어요',
   [ErrorCode.VISIT_ALREADY_CANCELED]: '이미 취소한 신청이에요',
   [ErrorCode.VISIT_ALREADY_STARTED]: '이미 시작한 방문은 바꾸거나 취소할 수 없어요',
+  [ErrorCode.VISIT_NOT_STARTED]: '아직 시작하지 않은 방문이에요. 퇴실 대신 취소해 주세요',
+  [ErrorCode.VISIT_ALREADY_ENDED]: '이미 끝난 방문이에요',
   [NETWORK_ERROR]: '연결이 불안정해요. 잠시 후 다시 시도해 주세요',
 };
 

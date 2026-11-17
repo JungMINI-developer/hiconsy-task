@@ -8,7 +8,14 @@ import { useAsync } from '@/composables/useAsync';
 import { useRefetchOnVisible } from '@/composables/useRefetch';
 import { useStudentGuard } from '@/composables/useStudentGuard';
 import { useToast } from '@/composables/useToast';
-import { isVisitEditable, useMyVisitsStore, visitGroup, type VisitGroup } from '@/stores/myVisits';
+import { useVisitCheckout } from '@/composables/useVisitCheckout';
+import {
+  isVisitEditable,
+  isVisitInProgress,
+  useMyVisitsStore,
+  visitGroup,
+  type VisitGroup,
+} from '@/stores/myVisits';
 import { useSessionStore } from '@/stores/session';
 import { cn } from '@/utils/cn';
 import {
@@ -100,6 +107,9 @@ function reapplyRoom(v: Visit): StudyRoom | null {
   if (!room.hasFreeSlot || !hasAvailableSlot(room)) return null;
   return room;
 }
+
+// 퇴실 (#66) — 진행 중인 방문은 변경·취소 대신 퇴실
+const checkout = useVisitCheckout(() => refresh());
 
 // 취소
 const canceling = ref<Visit | null>(null);
@@ -220,9 +230,15 @@ async function confirmCancel() {
                   취소
                 </AppButton>
               </template>
-              <p v-else class="text-caption text-fg-muted">
-                이미 시작한 방문은 바꾸거나 취소할 수 없어요
-              </p>
+              <AppButton
+                v-else-if="isVisitInProgress(visit)"
+                variant="secondary"
+                size="sm"
+                :aria-label="`${visit.studyRoom.name} 퇴실`"
+                @click="checkout.target.value = visit"
+              >
+                퇴실
+              </AppButton>
             </template>
             <RouterLink
               v-else
@@ -236,6 +252,14 @@ async function confirmCancel() {
       </ul>
     </template>
 
+    <ConfirmDialog
+      v-model:open="checkout.open.value"
+      title="지금 퇴실할까요?"
+      :description="checkout.description.value"
+      confirm-label="퇴실"
+      :loading="checkout.busy.value"
+      @confirm="checkout.confirm"
+    />
     <ConfirmDialog
       v-model:open="cancelOpen"
       title="방문을 취소할까요?"
