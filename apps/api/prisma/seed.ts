@@ -17,11 +17,15 @@ function fromNow(hour: number): Date {
   return new Date(Math.floor(Date.now() / SLOT) * SLOT + hour * HOUR);
 }
 
-/** 오늘 0시(로컬) 기준으로 dayOffset일 뒤 hour시 */
+const KST_OFFSET = 9 * HOUR;
+
+/**
+ * KST 오늘 0시 기준으로 dayOffset일 뒤 hour시.
+ * 실행 환경의 시간대를 쓰지 않는다 — Docker api 컨테이너는 UTC라 `setHours(0)`이 KST 09시가 된다 (#55).
+ */
 function at(dayOffset: number, hour: number): Date {
-  const base = new Date();
-  base.setHours(0, 0, 0, 0);
-  return new Date(base.getTime() + dayOffset * DAY + hour * HOUR);
+  const kstMidnight = Math.floor((Date.now() + KST_OFFSET) / DAY) * DAY - KST_OFFSET;
+  return new Date(kstMidnight + dayOffset * DAY + hour * HOUR);
 }
 
 /** 좌석 1~n번 (최대 인원 = 좌석 수, #45) */
