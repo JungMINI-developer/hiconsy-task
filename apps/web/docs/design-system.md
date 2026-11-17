@@ -35,7 +35,7 @@ OKLCH로 정의합니다. 라이트 모드만 MVP 범위이고, 다크 모드는
 | ------------------------- | ------------------------------------------ | --------------------- | ---------------------------- |
 | `--color-status-open`     | `bg-status-open`                           | 신청 가능 / 운영 중   | 배지                         |
 | `--color-status-warn`     | `bg-status-warn`                           | 주의                  | 이력 변경 점                 |
-| `--color-status-full`     | `bg-status-full`                           | 정원 마감             | 배지                         |
+| `--color-status-full`     | `bg-status-full`                           | 자동 취소·위험        | 배지, 삭제·에러              |
 | `--color-status-applied`  | `bg-status-applied/10 text-status-applied` | 신청됨 (내 신청)      | 배지 — accent와 같은 계열    |
 | `--color-status-canceled` | `text-status-canceled`                     | 취소됨                | 배지 (무채색, 텍스트로 구분) |
 | `--color-status-ended`    | `text-status-ended`                        | 운영 종료 / 지난 방문 | 배지 (무채색)                |
