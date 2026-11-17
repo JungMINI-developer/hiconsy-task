@@ -11,7 +11,7 @@
 | `refactor/…`, `chore/…`, `docs/…` | 그 외 작업 (`dev`에서 분기)                                |
 | `hotfix/#이슈번호-설명`           | 배포 긴급 수정 (`main`에서 분기 → `main`, `dev` 모두 반영) |
 
-예시: `feat/#3-login-api`, `fix/#12-cart-total`
+예시: `feat/#66-visit-checkout`, `fix/#55-seed-timezone`, `docs/#72-readme-final`
 
 ### 작업 흐름
 
@@ -54,9 +54,9 @@
 예시
 
 ```
-feat(api): 상품 목록 조회 API 추가
-fix(web): 장바구니 수량 변경 시 합계가 갱신되지 않는 문제 수정
-chore(deps): axios 버전 업데이트
+feat(api): 진행 중인 방문 조기 퇴실 API와 CHECKOUT 이력 (#66)
+fix(web): 320px 헤더 넘침 — 메뉴가 있으면 좁은 화면에서 로고 글자 숨김 (#63)
+test(web): 퇴실 직후 강사 '지금' 배치도에서 좌석이 비는지 검사 (#69)
 ```
 
 ## Git Hooks
@@ -76,14 +76,14 @@ chore(deps): axios 버전 업데이트
 
 ### 네이밍
 
-| 대상                     | 규칙                     | 예시                                             |
-| ------------------------ | ------------------------ | ------------------------------------------------ |
-| 변수, 함수               | camelCase                | `fetchProducts`                                  |
-| 클래스, 타입, 인터페이스 | PascalCase               | `ProductService`, `ApiResponse`                  |
-| 상수                     | UPPER_SNAKE_CASE         | `MAX_PAGE_SIZE`                                  |
-| Vue 컴포넌트 파일        | PascalCase               | `ProductCard.vue`                                |
-| Nest 파일                | kebab-case + 역할 접미사 | `product.controller.ts`, `create-product.dto.ts` |
-| boolean                  | `is`/`has`/`can` 접두사  | `isLoading`                                      |
+| 대상                     | 규칙                     | 예시                                          |
+| ------------------------ | ------------------------ | --------------------------------------------- |
+| 변수, 함수               | camelCase                | `findFreeSeats`                               |
+| 클래스, 타입, 인터페이스 | PascalCase               | `VisitsService`, `ApiResponse`                |
+| 상수                     | UPPER_SNAKE_CASE         | `ROOM_CAPACITY_MAX`                           |
+| Vue 컴포넌트 파일        | PascalCase               | `SeatMapGrid.vue`                             |
+| Nest 파일                | kebab-case + 역할 접미사 | `visits.controller.ts`, `create-visit.dto.ts` |
+| boolean                  | `is`/`has`/`can` 접두사  | `isLoading`                                   |
 
 ### Frontend (`apps/web`)
 
