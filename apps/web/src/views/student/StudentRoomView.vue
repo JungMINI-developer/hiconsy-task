@@ -24,6 +24,7 @@ import {
   isSameDay,
   toIsoWithOffset,
 } from '@/utils/datetime';
+import { seatUsageText } from '@/utils/roomSeats';
 import { errorMessage } from '@/utils/errorMessage';
 import { visitChangeText } from '@/utils/visitChange';
 import { decodeSlot, hasAvailableSlot } from '@/utils/visitSlots';
@@ -137,13 +138,6 @@ const blocked = computed<string | null>(() => {
   if (!r.hasFreeSlot && !myVisit.value) return '남은 시간에 빈 좌석이 없어요';
   return null;
 });
-
-function seatText() {
-  const r = room.value;
-  if (!r) return '';
-  const total = `좌석 ${r.maxPersonnel}석`;
-  return r.occupiedSeats === null ? total : `${total} · 지금 ${r.occupiedSeats}석 이용 중`;
-}
 
 function visitText(v: { startAt: string | Date; endAt: string | Date }) {
   return isSameDay(v.startAt, v.endAt)
@@ -344,7 +338,7 @@ function handleSaveError(e: unknown) {
     <template v-if="room" #description>
       <span class="tabular-nums">{{ formatRange(room.startDate, room.endDate) }}</span>
       <span aria-hidden="true"> · </span>
-      <span class="tabular-nums">{{ seatText() }}</span>
+      <span class="tabular-nums">{{ room ? seatUsageText(room) : '' }}</span>
     </template>
 
     <EmptyState

@@ -291,7 +291,7 @@ popper 위치, 모서리 14px, 그림자 하나. 선택한 항목의 보조 정�
 ### Tabs · Capacity · Timeline
 
 - 탭: 밑줄형, 활성은 grey900 글자 + 2px 밑줄. 개수는 데이터를 불러온 뒤에만 표시.
-- 정원 막대(`CapacityBar`): 8px 높이 트랙(grey100), 숫자 항상 병기, `role="meter"`.
+- 좌석 배치도(`SeatGrid` 학생 · `SeatMapGrid` 강사): 한 줄 5석 격자, "앞" 라벨, 상태를 색과 함께 글자·빗금·아이콘으로 병기.
   - 강사: **신청 인원**만큼 찹니다. 80% 이상 orange500, 100% red700.
   - 학생: **남은 자리**만큼 찹니다(라벨 "남은 자리 n"과 같은 방향). 남은 자리가 20% 이하면 orange500, 0이면 빈 막대 + red700 글자.
 - 이력(`HistoryTimeline`): 동작을 배지로 표시 — 신청 applied(파랑), 시간 변경 neutral, 취소 canceled, 자동 취소 full(빨강). 시간 변경은 `<del>이전</del> → 이후`.

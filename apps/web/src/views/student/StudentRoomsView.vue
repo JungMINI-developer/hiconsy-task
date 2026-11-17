@@ -15,6 +15,7 @@ import {
   isSameDay,
   formatRange,
 } from '@/utils/datetime';
+import { seatUsageText } from '@/utils/roomSeats';
 import { errorMessage } from '@/utils/errorMessage';
 import { hasAvailableSlot } from '@/utils/visitSlots';
 import PageShell from '@/components/layout/PageShell.vue';
@@ -75,12 +76,6 @@ const cards = computed<RoomCard[]>(() =>
     }),
 );
 
-/** `좌석 10석 · 지금 6석 이용 중` — 운영 시간이 아니면 좌석 수만 (#49) */
-function seatText(room: StudyRoom) {
-  const total = `좌석 ${room.maxPersonnel}석`;
-  return room.occupiedSeats === null ? total : `${total} · 지금 ${room.occupiedSeats}석 이용 중`;
-}
-
 function visitText(v: Visit) {
   const time = isSameDay(v.startAt, v.endAt)
     ? `${formatDate(v.startAt)} ${formatTimeRange(v.startAt, v.endAt)}`
@@ -128,7 +123,7 @@ function visitText(v: Visit) {
               >
                 내 방문 {{ visitText(myVisit) }}
               </p>
-              <p class="text-label text-fg-muted tabular-nums">{{ seatText(room) }}</p>
+              <p class="text-label text-fg-muted tabular-nums">{{ seatUsageText(room) }}</p>
             </div>
 
             <div class="ml-auto flex flex-wrap items-center justify-end gap-2">

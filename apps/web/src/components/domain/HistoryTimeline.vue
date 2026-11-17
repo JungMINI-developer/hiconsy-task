@@ -7,7 +7,8 @@ import type { BadgeVariants } from '@/components/ui/variants';
 
 /**
  * 방문 신청·변경·취소 이력 타임라인 (최신이 위).
- * 변경은 "이전 → 이후"를 한 줄로, 시스템 처리는 사유와 함께 보여준다.
+ * 변경은 바뀐 것(시간·좌석)만 "이전 → 이후"로 한 줄에, 시스템 처리는 사유와 함께 보여준다.
+ * 좌석 도입 전 이력(`seat`가 null)은 좌석을 빼고 보여준다 (#51).
  */
 withDefaults(
   defineProps<{
@@ -18,7 +19,7 @@ withDefaults(
   { showStudent: true },
 );
 
-const ACTION_LABEL = { APPLY: '신청', UPDATE: '시간 변경', CANCEL: '취소' } as const;
+const ACTION_LABEL = { APPLY: '신청', UPDATE: '변경', CANCEL: '취소' } as const;
 
 /** 훑어볼 때 종류가 먼저 보이도록 배지 색을 나눈다 (글자 라벨이 있어 색만으로 구분하지 않음) */
 function actionTone(h: StudyRoomHistory): BadgeVariants['tone'] {
@@ -40,6 +41,23 @@ function dotClass(h: StudyRoomHistory) {
 
 /** 방문 구간 — 운영 기간이 여러 날일 수 있으므로 날짜를 항상 붙인다 */
 const visitRange = (start: string, end: string) => formatRange(start, end);
+
+/** 변경에서 시간이 바뀌었는지 (좌석만 바꾼 변경은 시간을 보여주지 않는다) */
+function timeChanged(h: StudyRoomHistory): h is StudyRoomHistory & {
+  prevStartAt: string;
+  prevEndAt: string;
+} {
+  if (h.action !== 'UPDATE' || !h.prevStartAt || !h.prevEndAt) return false;
+  const same = (a: string, b: string) => new Date(a).getTime() === new Date(b).getTime();
+  return !same(h.prevStartAt, h.startAt) || !same(h.prevEndAt, h.endAt);
+}
+
+function seatChanged(h: StudyRoomHistory) {
+  return h.action === 'UPDATE' && !!h.prevSeat && !!h.seat && h.prevSeat.id !== h.seat.id;
+}
+
+/** 시간을 보여줄지 — 좌석만 바꾼 변경이면 숨긴다 */
+const showTime = (h: StudyRoomHistory) => h.action !== 'UPDATE' || timeChanged(h) || !h.seat;
 
 const ACTOR_NOTE = { SYSTEM: '시스템 처리', INSTRUCTOR: '강사 처리', STUDENT: null } as const;
 </script>
@@ -68,13 +86,23 @@ const ACTOR_NOTE = { SYSTEM: '시스템 처리', INSTRUCTOR: '강사 처리', ST
               {{ actionLabel(h) }}
             </AppBadge>
             <span class="tabular-nums">
-              <template v-if="h.action === 'UPDATE' && h.prevStartAt && h.prevEndAt">
+              <template v-if="timeChanged(h)">
                 <del class="text-fg-muted">{{ visitRange(h.prevStartAt, h.prevEndAt) }}</del>
                 <span class="mx-1" aria-hidden="true">→</span>
                 <span class="sr-only">에서</span>
                 {{ visitRange(h.startAt, h.endAt) }}
               </template>
-              <template v-else>{{ visitRange(h.startAt, h.endAt) }}</template>
+              <template v-else-if="showTime(h)">{{ visitRange(h.startAt, h.endAt) }}</template>
+            </span>
+            <span v-if="h.seat" class="tabular-nums" data-testid="history-seat">
+              <span v-if="showTime(h)" class="mx-1 text-fg-muted" aria-hidden="true">·</span>
+              <template v-if="seatChanged(h)">
+                <del class="text-fg-muted">{{ h.prevSeat!.number }}번</del>
+                <span class="mx-1" aria-hidden="true">→</span>
+                <span class="sr-only">에서</span>
+                {{ h.seat.number }}번 좌석
+              </template>
+              <template v-else>{{ h.seat.number }}번 좌석</template>
             </span>
           </p>
           <p v-if="ACTOR_NOTE[h.actorType] || h.reason" class="text-caption text-fg-muted">

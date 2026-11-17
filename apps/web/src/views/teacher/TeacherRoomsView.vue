@@ -8,13 +8,12 @@ import { useDialogQuery } from '@/composables/useDialogQuery';
 import { scrollToItem, useHighlight, useRefetchOnVisible } from '@/composables/useRefetch';
 import { useToast } from '@/composables/useToast';
 import { getRoomPhase } from '@/utils/datetime';
+import { seatUsageText } from '@/utils/roomSeats';
 import { errorMessage } from '@/utils/errorMessage';
 import PageShell from '@/components/layout/PageShell.vue';
-import CapacityBar from '@/components/domain/CapacityBar.vue';
 import RoomPhaseBadge from '@/components/domain/RoomPhaseBadge.vue';
 import StudyRoomCard from '@/components/domain/StudyRoomCard.vue';
 import StudyRoomFormDialog from '@/components/domain/StudyRoomFormDialog.vue';
-import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppDropdownMenu from '@/components/ui/AppDropdownMenu.vue';
 import AppSkeleton from '@/components/ui/AppSkeleton.vue';
@@ -180,9 +179,6 @@ const menuItems = [
             :muted="tab === 'ended'"
           >
             <template #badges>
-              <AppBadge v-if="room.currentPersonnel >= room.maxPersonnel" tone="full">
-                정원 마감
-              </AppBadge>
               <RoomPhaseBadge :phase="getRoomPhase(room)" />
             </template>
             <template #menu>
@@ -192,7 +188,9 @@ const menuItems = [
                 @select="(key) => onMenu(room, key)"
               />
             </template>
-            <CapacityBar :current="room.currentPersonnel" :max="room.maxPersonnel" />
+            <p class="text-label tabular-nums" data-testid="room-seats">
+              {{ seatUsageText(room) }}
+            </p>
           </StudyRoomCard>
         </li>
       </ul>
