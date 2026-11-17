@@ -43,4 +43,4 @@
 | `impeccable audit` (P0·P1 0건)  | 화면 구현 PR |
 | VoiceOver로 신청·취소 흐름 확인 | MVP 완료 시  |
 
-> #18 점검 결과(대비 수치, 320px·키보드·에러 상태 확인)는 [DESIGN.md](../DESIGN.md#검증-결과-18)에 있습니다. VoiceOver 확인은 아직 하지 않았습니다.
+> #18 점검 결과(대비 수치, 320px·키보드·에러 상태 확인)는 [DESIGN.md](../DESIGN.md#검증-23)에 있습니다. VoiceOver 확인은 아직 하지 않았습니다.
