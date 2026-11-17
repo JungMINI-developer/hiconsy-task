@@ -25,7 +25,8 @@ function seatLabel(seat: SeatOccupancy) {
 function seatClass(seat: SeatOccupancy) {
   const highlighted = seat.id === props.highlightedSeatId;
   return cn(
-    'relative flex min-h-12 min-w-0 flex-col items-start justify-between gap-0.5 rounded-md border px-1.5 py-1 text-left tabular-nums transition-colors duration-120 ease-standard sm:min-h-16 sm:px-2 sm:py-1.5',
+    // 320px에서는 칸이 약 46px라 여백을 줄이고 가운데 정렬해 세 글자 이름이 들어가게 한다
+    'relative flex min-h-12 min-w-0 flex-col items-center justify-between gap-0.5 rounded-md border px-0.5 py-1 text-center tabular-nums transition-colors duration-120 ease-standard sm:min-h-16 sm:items-start sm:px-2 sm:py-1.5 sm:text-left',
     seat.visit ? 'border-transparent bg-accent-weak text-fg' : 'border-line-input bg-surface',
     highlighted && 'border-accent ring-2 ring-accent',
   );
