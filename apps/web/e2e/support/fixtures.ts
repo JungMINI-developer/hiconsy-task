@@ -1,6 +1,6 @@
 import { test as base, expect, type APIRequestContext, type Page } from '@playwright/test';
 import pg from 'pg';
-import type { ApiResponse, Student, StudyRoom, Visit } from '@hiconsy/shared';
+import type { ApiResponse, SeatAvailability, Student, StudyRoom, Visit } from '@hiconsy/shared';
 import { E2E_API_URL, E2E_DATABASE_URL } from './env';
 
 /** 테스트 사이 격리: 모든 도메인 테이블을 비운다 (API e2e의 resetDatabase와 같은 방식) */
@@ -52,8 +52,32 @@ export class Seed {
     });
   }
 
-  visit(studentId: number, studyRoomId: number, startAt: string, endAt: string) {
-    return this.post<Visit>(`/students/${studentId}/visits`, { studyRoomId, startAt, endAt });
+  /** `seat`(좌석 번호)를 주지 않으면 서버가 빈 좌석을 배정한다 */
+  async visit(
+    studentId: number,
+    studyRoomId: number,
+    startAt: string,
+    endAt: string,
+    opts: { seat?: number } = {},
+  ) {
+    const seatId = opts.seat === undefined ? undefined : await this.seatId(studyRoomId, opts.seat);
+    return this.post<Visit>(`/students/${studentId}/visits`, {
+      studyRoomId,
+      startAt,
+      endAt,
+      ...(seatId !== undefined && { seatId }),
+    });
+  }
+
+  private async seatId(studyRoomId: number, number: number) {
+    const res = await this.api.get(`${E2E_API_URL}/study-rooms/${studyRoomId}/seats`, {
+      params: { startAt: kst(1, 10), endAt: kst(1, 11) },
+    });
+    expect(res.ok(), await res.text()).toBeTruthy();
+    const seats = ((await res.json()) as ApiResponse<SeatAvailability[]>).data;
+    const seat = seats.find((s) => s.number === number);
+    if (!seat) throw new Error(`${number}번 좌석이 없어요`);
+    return seat.id;
   }
 
   async changeVisit(studentId: number, visitId: number, startAt: string, endAt: string) {

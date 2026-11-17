@@ -10,11 +10,9 @@ import { useToast } from '@/composables/useToast';
 import { getRoomPhase } from '@/utils/datetime';
 import { errorMessage } from '@/utils/errorMessage';
 import PageShell from '@/components/layout/PageShell.vue';
-import CapacityBar from '@/components/domain/CapacityBar.vue';
 import RoomPhaseBadge from '@/components/domain/RoomPhaseBadge.vue';
 import StudyRoomCard from '@/components/domain/StudyRoomCard.vue';
 import StudyRoomFormDialog from '@/components/domain/StudyRoomFormDialog.vue';
-import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppDropdownMenu from '@/components/ui/AppDropdownMenu.vue';
 import AppSkeleton from '@/components/ui/AppSkeleton.vue';
@@ -180,9 +178,6 @@ const menuItems = [
             :muted="tab === 'ended'"
           >
             <template #badges>
-              <AppBadge v-if="room.currentPersonnel >= room.maxPersonnel" tone="full">
-                정원 마감
-              </AppBadge>
               <RoomPhaseBadge :phase="getRoomPhase(room)" />
             </template>
             <template #menu>
@@ -192,7 +187,10 @@ const menuItems = [
                 @select="(key) => onMenu(room, key)"
               />
             </template>
-            <CapacityBar :current="room.currentPersonnel" :max="room.maxPersonnel" />
+            <!-- 좌석을 시간별로 나눠 쓰므로 예약 건수가 좌석 수보다 많을 수 있다 (설계 결정 8) -->
+            <p class="text-label tabular-nums" data-testid="room-seats">
+              {{ room.maxPersonnel }}석 · 예약 {{ room.currentPersonnel }}건
+            </p>
           </StudyRoomCard>
         </li>
       </ul>

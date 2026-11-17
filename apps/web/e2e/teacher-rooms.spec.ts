@@ -24,7 +24,7 @@ test.describe('강사 · 자습실 등록', () => {
     await expect(dialog).toBeHidden();
     await expect(page).toHaveURL('/teacher/rooms');
     await expect(page.getByRole('link', { name: '3층 A 자습실' })).toBeVisible();
-    await expect(page.getByText('0 / 3명')).toBeVisible();
+    await expect(page.getByText('3석 · 예약 0건')).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
 
@@ -45,25 +45,34 @@ test.describe('강사 · 자습실 등록', () => {
 });
 
 test.describe('강사 · 자습실 수정', () => {
-  test('현재 신청 인원보다 정원을 줄일 수 없다', async ({ page, seed }) => {
-    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 3 });
+  test('없어질 좌석에 끝나지 않은 예약이 있으면 좌석을 줄일 수 없다', async ({ page, seed }) => {
+    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 5 });
     const a = await seed.student('김하늘', '010-1111-1111');
     const b = await seed.student('이도윤', '010-2222-2222');
-    await seed.visit(a.id, room.id, kst(1, 11), kst(1, 12));
-    await seed.visit(b.id, room.id, kst(1, 13), kst(1, 14));
+    await seed.visit(a.id, room.id, kst(1, 11), kst(1, 12), { seat: 1 });
+    await seed.visit(b.id, room.id, kst(1, 13), kst(1, 14), { seat: 4 });
 
     await page.goto('/teacher/rooms');
     await page.getByRole('button', { name: 'A 자습실 메뉴' }).click();
     await page.getByRole('menuitem', { name: '수정' }).click();
 
     const dialog = page.getByRole('dialog', { name: '자습실 수정' });
-    await expect(dialog.getByText('현재 2명이 신청했어요')).toBeVisible();
-    // 포커스를 벗어나지 않아도 입력하는 즉시 안내한다 (#26)
-    await dialog.getByLabel('최대 인원').fill('1');
-    await expect(dialog.getByLabel('최대 인원')).toBeFocused();
-    await expect(dialog.getByText('현재 2명이 신청했어요. 2명 이상으로 정해 주세요')).toBeVisible();
+    await expect(dialog.getByText('좌석 수예요 (1~30석)')).toBeVisible();
+    // 줄이면 없어질 좌석을 입력 즉시 알린다 (막지는 않음 — 서버가 판단)
+    await dialog.getByLabel('최대 인원').fill('3');
+    await expect(dialog.getByText('4번, 5번 좌석이 없어져요')).toBeVisible();
     await dialog.getByRole('button', { name: '저장' }).click();
+    await expect(
+      dialog.getByText('없어질 좌석에 끝나지 않은 예약이 있어 3석으로 줄일 수 없어요'),
+    ).toBeVisible();
     await expect(dialog).toBeVisible();
+
+    // 예약이 없는 좌석만 없어지면 줄일 수 있다
+    await dialog.getByLabel('최대 인원').fill('4');
+    await expect(dialog.getByText('5번 좌석이 없어져요')).toBeVisible();
+    await dialog.getByRole('button', { name: '저장' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('4석 · 예약 2건')).toBeVisible();
   });
 
   test('운영 기간 밖으로 밀려나는 신청이 있으면 막고 신청자를 보여준다', async ({ page, seed }) => {
@@ -77,10 +86,10 @@ test.describe('강사 · 자습실 수정', () => {
     await dialog.getByRole('button', { name: '저장' }).click();
 
     await expect(dialog.getByRole('alert')).toContainText('새 운영 기간 밖에 있는 신청이 있어요');
-    await dialog.getByRole('link', { name: '신청자 보기' }).click();
+    await dialog.getByRole('link', { name: '신청 학생 보기' }).click();
 
     await expect(dialog).toBeHidden();
-    await expect(page).toHaveURL(new RegExp(`/teacher/rooms/${room.id}\\?tab=applicants`));
+    await expect(page).toHaveURL(new RegExp(`/teacher/rooms/${room.id}$`));
     await expect(page.getByRole('cell', { name: '김하늘', exact: true })).toBeVisible();
   });
 });
