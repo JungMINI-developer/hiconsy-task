@@ -34,6 +34,8 @@ export interface RoomSeatStatus {
   occupiedSeats: number | null;
   /** 남은 운영 시간에 30분 이상 비는 좌석이 하나라도 있는지 */
   hasFreeSlot: boolean;
+  /** 끝나지 않은(진행 중 포함) 유효 신청 수 — 삭제하면 자동 취소될 신청 (#57) */
+  unfinishedVisits: number;
 }
 
 /**
@@ -51,7 +53,6 @@ export async function computeRoomSeatStatus(
       studyRoomId: { in: rooms.map((r) => r.id) },
       status: 'APPLIED',
       endAt: { gt: now },
-      seat: { isNot: null },
     },
     select: {
       studyRoomId: true,
@@ -65,6 +66,7 @@ export async function computeRoomSeatStatus(
   for (const room of rooms) {
     const nowMs = now.getTime();
     const operating = room.startDate.getTime() <= nowMs && nowMs < room.endDate.getTime();
+    const unfinishedVisits = visits.filter((v) => v.studyRoomId === room.id).length;
     const roomVisits = visits.filter(
       (v) => v.studyRoomId === room.id && v.seat !== null && v.seat.number <= room.maxPersonnel,
     );
@@ -86,7 +88,7 @@ export async function computeRoomSeatStatus(
       (bySeat.size < room.maxPersonnel ||
         [...bySeat.values()].some((seatVisits) => seatHasFreeSlot(seatVisits, from, until)));
 
-    result.set(room.id, { occupiedSeats, hasFreeSlot });
+    result.set(room.id, { occupiedSeats, hasFreeSlot, unfinishedVisits });
   }
   return result;
 }

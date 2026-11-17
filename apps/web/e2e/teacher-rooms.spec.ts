@@ -252,7 +252,7 @@ test.describe('강사 · 자습실 상세 · 삭제', () => {
     await page.getByRole('menuitem', { name: '삭제' }).click();
 
     const confirm = page.getByRole('alertdialog', { name: '자습실을 삭제할까요?' });
-    await expect(confirm).toContainText('신청한 학생 1명의 신청이 모두 취소돼요');
+    await expect(confirm).toContainText('끝나지 않은 신청 1건이 취소돼요');
     // 기본 포커스는 안전한 쪽
     await expect(confirm.getByRole('button', { name: '닫기' })).toBeFocused();
     await confirm.getByRole('button', { name: '삭제' }).click();

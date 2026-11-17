@@ -59,7 +59,7 @@ function onGone() {
   void students.run();
 }
 
-// 삭제: 확인 전에 유효 신청 수를 가져와 영향을 알려준다
+// 삭제: 확인 전에 취소될(끝나지 않은) 신청 수를 가져와 영향을 알려준다
 const deleting = ref<Student | null>(null);
 const activeVisitCount = ref<number | null>(null);
 const removing = ref(false);
@@ -69,8 +69,11 @@ const deleteOpen = computed({
 });
 const deleteDescription = computed(() => {
   const n = activeVisitCount.value;
-  if (n === null) return '이 학생의 유효 신청이 있으면 모두 취소돼요.';
-  return n > 0 ? `유효 신청 ${n}건이 취소돼요.` : '유효 신청이 없어요. 삭제하면 목록에서 사라져요.';
+  if (n === null)
+    return '이 학생의 끝나지 않은 신청이 있으면 모두 취소돼요. 지난 방문 기록은 그대로 남아요.';
+  return n > 0
+    ? `끝나지 않은 신청 ${n}건이 취소돼요. 지난 방문 기록은 그대로 남아요.`
+    : '취소될 신청이 없어요. 삭제하면 목록에서 사라져요.';
 });
 
 async function askDelete(student: Student) {
@@ -79,7 +82,11 @@ async function askDelete(student: Student) {
   try {
     const visits = await visitsApi.list(student.id);
     if (deleting.value?.id === student.id) {
-      activeVisitCount.value = visits.filter((v) => v.status === 'APPLIED').length;
+      // 삭제하면 끝나지 않은 신청만 취소된다 — 지난 방문은 그대로 남는다 (#57)
+      const now = Date.now();
+      activeVisitCount.value = visits.filter(
+        (v) => v.status === 'APPLIED' && new Date(v.endAt).getTime() > now,
+      ).length;
     }
   } catch {
     /* 개수를 못 가져와도 삭제는 할 수 있다 */
