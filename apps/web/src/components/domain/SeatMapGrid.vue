@@ -86,11 +86,20 @@ function seatClass(seat: SeatOccupancy) {
             >
               {{ seat.visit.student.name }}
             </span>
+            <!-- 320px에서는 끝나는 시각을 숨기지만 "탈퇴"는 보인다 (색만으로 구분하지 않도록) -->
             <span
+              v-if="seat.visit.student.deletedAt"
+              class="text-caption leading-none text-fg-muted"
+              aria-hidden="true"
+            >
+              탈퇴
+            </span>
+            <span
+              v-else
               class="hidden text-caption leading-none text-fg-muted sm:inline"
               aria-hidden="true"
             >
-              {{ seat.visit.student.deletedAt ? '탈퇴' : `~${formatTime(seat.visit.endAt)}` }}
+              ~{{ formatTime(seat.visit.endAt) }}
             </span>
           </template>
         </li>
