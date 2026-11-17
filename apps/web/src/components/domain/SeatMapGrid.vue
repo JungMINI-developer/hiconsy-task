@@ -19,7 +19,8 @@ const props = defineProps<{
 function seatLabel(seat: SeatOccupancy) {
   if (!seat.visit) return `${seat.number}번 좌석, 비어 있음`;
   const v = seat.visit;
-  return `${seat.number}번 좌석, ${v.student.name}, ${formatTimeRange(v.startAt, v.endAt)}`;
+  const withdrawn = v.student.deletedAt ? ', 탈퇴한 학생' : '';
+  return `${seat.number}번 좌석, ${v.student.name}${withdrawn}, ${formatTimeRange(v.startAt, v.endAt)}`;
 }
 
 function seatClass(seat: SeatOccupancy) {
@@ -72,11 +73,13 @@ function seatClass(seat: SeatOccupancy) {
             {{ seat.number }}
           </span>
           <template v-if="seat.visit">
+            <!-- 탈퇴한 학생(#61): 칸이 좁아 배지 대신 이름을 흐리게, 끝나는 시각 자리에 "탈퇴". 스크린리더·툴팁은 "탈퇴한 학생" -->
             <span
               :class="
                 cn(
                   'w-full truncate text-caption leading-tight sm:text-label',
                   seat.id === highlightedSeatId && 'font-bold',
+                  seat.visit.student.deletedAt && 'text-fg-muted',
                 )
               "
               aria-hidden="true"
@@ -87,7 +90,7 @@ function seatClass(seat: SeatOccupancy) {
               class="hidden text-caption leading-none text-fg-muted sm:inline"
               aria-hidden="true"
             >
-              ~{{ formatTime(seat.visit.endAt) }}
+              {{ seat.visit.student.deletedAt ? '탈퇴' : `~${formatTime(seat.visit.endAt)}` }}
             </span>
           </template>
         </li>
