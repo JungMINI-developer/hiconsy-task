@@ -179,6 +179,39 @@ test.describe('강사 · 자습실 상세 · 좌석 현황 (#51)', () => {
   });
 });
 
+test.describe('강사 · 자습실 상세 · 탈퇴한 학생 (#61)', () => {
+  test('지난 방문이 있는 학생을 삭제하면 신청 학생·배치도·이력에 "탈퇴"로 남는다', async ({
+    page,
+    seed,
+  }) => {
+    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 5 });
+    const a = await seed.student('김하늘', '010-1111-1111');
+    const b = await seed.student('이도윤', '010-2222-2222');
+    await seed.visit(a.id, room.id, kst(1, 10), kst(1, 12), { seat: 1 });
+    await seed.visit(b.id, room.id, kst(1, 10), kst(1, 12), { seat: 2 });
+    // 하루가 지나 두 방문 모두 끝났다고 보고, 김하늘을 삭제한다 (지난 방문은 기록으로 남는다, #57)
+    await seed.shiftRoomBack(room.id, 24);
+    await seed.deleteStudent(a.id);
+
+    await page.goto(`/teacher/rooms/${room.id}`);
+    const haneul = applicantList(page).getByRole('button', { name: /김하늘/ });
+    const doyun = applicantList(page).getByRole('button', { name: /이도윤/ });
+    await expect(haneul.getByTestId('withdrawn')).toHaveText('탈퇴');
+    await expect(doyun.getByTestId('withdrawn')).toHaveCount(0);
+
+    // 배치도: 그 학생의 방문 시각으로 옮기면 "탈퇴한 학생"으로 읽힌다
+    await haneul.click();
+    await expect(seat(page, 1)).toHaveAccessibleName(/김하늘, 탈퇴한 학생/);
+    await expect(seat(page, 2)).not.toHaveAccessibleName(/탈퇴/);
+
+    await page.getByRole('tab', { name: /이력/ }).click();
+    const items = page.getByRole('region', { name: '이력' }).getByRole('listitem');
+    await expect(items.filter({ hasText: '김하늘' }).getByTestId('withdrawn')).toHaveText('탈퇴');
+    await expect(items.filter({ hasText: '이도윤' }).getByTestId('withdrawn')).toHaveCount(0);
+    await expectNoHorizontalScroll(page);
+  });
+});
+
 test.describe('강사 · 자습실 상세 · 삭제', () => {
   test('이력 탭에서 신청·변경·취소를 시간순으로 보고 거를 수 있다', async ({ page, seed }) => {
     const room = await seed.room({ name: 'A 자습실' });
