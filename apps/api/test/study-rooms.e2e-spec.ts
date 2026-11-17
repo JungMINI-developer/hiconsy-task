@@ -289,6 +289,36 @@ describe('StudyRooms (e2e)', () => {
       expect(histories[1]).toMatchObject({ actorType: 'SYSTEM', reason: '자습실 삭제' });
     });
 
+    it('지난 방문은 그대로 두고, 진행 중·앞으로의 방문만 자동 취소한다 (#57)', async () => {
+      const roomId = await createRoom();
+      const hour = 60 * 60 * 1000;
+      const at = (h: number) => new Date(Date.now() + h * hour).toISOString();
+      // 어제부터 내일까지 운영 중인 자습실 (등록 API는 과거 시작을 받지 않으므로 DB에서 옮긴다)
+      await prisma.studyRoom.update({
+        where: { id: roomId },
+        data: { startDate: at(-24), endDate: at(24) },
+      });
+      const past = await applyVisit(roomId, at(-20), at(-18), '지난 방문', 1);
+      const ongoing = await applyVisit(roomId, at(-1), at(1), '진행 중', 2);
+      const upcoming = await applyVisit(roomId, at(2), at(4), '앞으로', 3);
+
+      // 삭제 확인 창에 보여줄 "취소될 신청 수"는 끝나지 않은 신청만 센다
+      const before = await api().get(`/api/study-rooms/${roomId}`).expect(200);
+      expect(before.body.data).toMatchObject({ currentPersonnel: 3, unfinishedVisits: 2 });
+
+      await api().delete(`/api/study-rooms/${roomId}`).expect(204);
+
+      const statuses = await prisma.visit.findMany({
+        where: { id: { in: [past.id, ongoing.id, upcoming.id] } },
+        orderBy: { id: 'asc' },
+      });
+      expect(statuses.map((v) => v.status)).toEqual(['APPLIED', 'CANCELED', 'CANCELED']);
+      expect(statuses[0]!.canceledAt).toBeNull();
+
+      const pastHistories = await prisma.visitHistory.findMany({ where: { visitId: past.id } });
+      expect(pastHistories.map((h) => h.action)).toEqual(['APPLY']);
+    });
+
     it('삭제된 자습실은 조회·수정·삭제할 수 없다', async () => {
       const roomId = await createRoom();
       await api().delete(`/api/study-rooms/${roomId}`).expect(204);

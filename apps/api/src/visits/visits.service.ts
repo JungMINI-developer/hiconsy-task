@@ -8,6 +8,7 @@ import { pickSeat } from '../seats/seat-occupancy.js';
 import { lockStudyRoom } from '../study-rooms/study-room-lock.js';
 import type { CreateVisitDto } from './dto/create-visit.dto.js';
 import type { UpdateVisitDto } from './dto/update-visit.dto.js';
+import { cancelHistoryData } from './visit-cancellation.js';
 import { toVisit, visitInclude } from './visit.mapper.js';
 import { assertValidVisitTime } from './visit-time.js';
 
@@ -147,7 +148,7 @@ export class VisitsService {
   async cancel(studentId: number, visitId: number): Promise<Visit> {
     return this.prisma.$transaction(async (tx) => {
       // 취소는 시간 겹침을 만들 수 없으므로 학생 삭제와만 직렬화한다
-      const { visit, room } = await this.lockOwnVisit(tx, studentId, visitId, 'share');
+      const { visit } = await this.lockOwnVisit(tx, studentId, visitId, 'share');
       assertChangeable(visit);
 
       const canceled = await tx.visit.update({
@@ -155,21 +156,7 @@ export class VisitsService {
         data: { status: 'CANCELED', canceledAt: new Date() },
         include: visitInclude,
       });
-      await tx.visitHistory.create({
-        data: {
-          visitId: visit.id,
-          studentId,
-          studyRoomId: room.id,
-          action: 'CANCEL',
-          prevStartAt: visit.startAt,
-          prevEndAt: visit.endAt,
-          startAt: visit.startAt,
-          endAt: visit.endAt,
-          prevSeatId: visit.seatId,
-          seatId: visit.seatId,
-          actorType: 'STUDENT',
-        },
-      });
+      await tx.visitHistory.create({ data: cancelHistoryData(visit, 'STUDENT') });
       return toVisit(canceled);
     });
   }

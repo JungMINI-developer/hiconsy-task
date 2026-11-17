@@ -149,6 +149,34 @@ describe('Students (e2e)', () => {
       ]);
     });
 
+    it('지난 방문은 그대로 두고, 끝나지 않은 방문만 자동 취소한다 (#57)', async () => {
+      const studentId = await createStudent();
+      const hour = 60 * 60 * 1000;
+      const at = (h: number) => new Date(Date.now() + h * hour);
+      const room = await prisma.studyRoom.create({
+        data: { name: 'A 자습실', maxPersonnel: 3, startDate: at(-48), endDate: at(48) },
+      });
+      const past = await prisma.visit.create({
+        data: { studentId, studyRoomId: room.id, startAt: at(-30), endAt: at(-28) },
+      });
+      const otherRoom = await prisma.studyRoom.create({
+        data: { name: 'B 자습실', maxPersonnel: 3, startDate: at(-48), endDate: at(48) },
+      });
+      const upcoming = await prisma.visit.create({
+        data: { studentId, studyRoomId: otherRoom.id, startAt: at(2), endAt: at(4) },
+      });
+
+      await api().delete(`/api/students/${studentId}`).expect(204);
+
+      expect((await prisma.visit.findUniqueOrThrow({ where: { id: past.id } })).status).toBe(
+        'APPLIED',
+      );
+      expect((await prisma.visit.findUniqueOrThrow({ where: { id: upcoming.id } })).status).toBe(
+        'CANCELED',
+      );
+      expect(await prisma.visitHistory.count({ where: { visitId: past.id } })).toBe(0);
+    });
+
     it('이미 삭제된 학생은 STUDENT_NOT_FOUND', async () => {
       const id = await createStudent();
       await api().delete(`/api/students/${id}`).expect(204);
