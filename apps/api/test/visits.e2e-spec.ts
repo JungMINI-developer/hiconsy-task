@@ -440,6 +440,7 @@ describe('Visits (e2e)', () => {
       const res = await checkout(me, visitId).expect(200);
       const endAt = new Date(res.body.data.endAt).getTime();
       expect(Math.abs(endAt - Date.now())).toBeLessThan(10_000);
+      expect(endAt % 1000).toBe(0); // 초 단위 (#69)
       expect(res.body.data.status).toBe('APPLIED');
       expect(new Date(res.body.data.startAt).getTime()).toBe(before.startAt.getTime());
 
