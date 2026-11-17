@@ -9,6 +9,7 @@ import type {
 import { toKstIso, toKstIsoOrNull } from '../common/utils/date.js';
 import type { RoomSeatStatus } from '../seats/room-seat-status.js';
 import { toSeatRef } from '../seats/seat.mapper.js';
+import { toStudentContact } from '../students/student.mapper.js';
 
 export function toStudyRoom(
   row: StudyRoomRow,
@@ -32,7 +33,7 @@ export function toStudyRoom(
 
 export function toStudyRoomHistory(
   row: VisitHistoryRow & {
-    student: Pick<StudentRow, 'id' | 'name'>;
+    student: Pick<StudentRow, 'id' | 'name' | 'deletedAt'>;
     prevSeat: SeatRow | null;
     seat: SeatRow | null;
   },
@@ -40,7 +41,11 @@ export function toStudyRoomHistory(
   return {
     id: row.id,
     visitId: row.visitId,
-    student: { id: row.student.id, name: row.student.name },
+    student: {
+      id: row.student.id,
+      name: row.student.name,
+      deletedAt: toKstIsoOrNull(row.student.deletedAt),
+    },
     action: row.action,
     prevStartAt: toKstIsoOrNull(row.prevStartAt),
     prevEndAt: toKstIsoOrNull(row.prevEndAt),
@@ -56,14 +61,14 @@ export function toStudyRoomHistory(
 
 export function toStudyRoomVisit(
   row: VisitRow & {
-    student: Pick<StudentRow, 'id' | 'name' | 'phone'>;
+    student: Pick<StudentRow, 'id' | 'name' | 'phone' | 'deletedAt'>;
     seat: SeatRow | null;
     histories: Pick<VisitHistoryRow, 'createdAt'>[];
   },
 ): StudyRoomVisit {
   return {
     id: row.id,
-    student: { id: row.student.id, name: row.student.name, phone: row.student.phone },
+    student: toStudentContact(row.student),
     startAt: toKstIso(row.startAt),
     endAt: toKstIso(row.endAt),
     seat: toSeatRef(row.seat),

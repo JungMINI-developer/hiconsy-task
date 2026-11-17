@@ -6,7 +6,7 @@ import HistoryTimeline from '../HistoryTimeline.vue';
 const base: StudyRoomHistory = {
   id: 1,
   visitId: 1,
-  student: { id: 1, name: '김하늘' },
+  student: { id: 1, name: '김하늘', deletedAt: null },
   action: 'APPLY',
   prevStartAt: null,
   prevEndAt: null,
@@ -93,6 +93,24 @@ describe('HistoryTimeline', () => {
     });
     expect(wrapper.text()).toContain('자동 취소');
     expect(wrapper.text()).toContain('시스템 처리 · 사유: 자습실 삭제');
+  });
+
+  it('탈퇴한 학생은 이름 옆에 "탈퇴" 배지를 붙인다 (#61)', () => {
+    const wrapper = mount(HistoryTimeline, {
+      props: {
+        items: [
+          {
+            ...base,
+            id: 1,
+            student: { id: 1, name: '김하늘', deletedAt: '2026-11-17T10:00:00+09:00' },
+          },
+          { ...base, id: 2, student: { id: 2, name: '이도윤', deletedAt: null } },
+        ],
+      },
+    });
+    const items = wrapper.findAll('li');
+    expect(items[0]!.find('[data-testid="withdrawn"]').text()).toBe('탈퇴');
+    expect(items[1]!.find('[data-testid="withdrawn"]').exists()).toBe(false);
   });
 
   it('showStudent=false면 학생 이름을 숨긴다', () => {

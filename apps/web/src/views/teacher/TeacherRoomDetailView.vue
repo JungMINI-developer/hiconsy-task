@@ -33,6 +33,7 @@ import HistoryTimeline from '@/components/domain/HistoryTimeline.vue';
 import RoomPhaseBadge from '@/components/domain/RoomPhaseBadge.vue';
 import SeatMapGrid from '@/components/domain/SeatMapGrid.vue';
 import StudyRoomFormDialog from '@/components/domain/StudyRoomFormDialog.vue';
+import AppBadge from '@/components/ui/AppBadge.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
@@ -341,6 +342,15 @@ async function confirmDelete() {
                     <span :class="cn('truncate', seatedNow(a) && 'font-bold')">
                       {{ a.student.name }}
                     </span>
+                    <!-- 학생을 삭제해도 지난 방문은 기록으로 남는다 (#57, #61) -->
+                    <AppBadge
+                      v-if="a.student.deletedAt"
+                      tone="canceled"
+                      class="shrink-0 self-center"
+                      data-testid="withdrawn"
+                    >
+                      탈퇴
+                    </AppBadge>
                     <span v-if="a.seat" class="shrink-0 text-label text-fg-muted tabular-nums">
                       {{ a.seat.number }}번
                     </span>

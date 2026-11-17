@@ -82,6 +82,15 @@ const ACTOR_NOTE = { SYSTEM: '시스템 처리', INSTRUCTOR: '강사 처리', ST
         <div class="min-w-0 text-body">
           <p>
             <span v-if="showStudent" class="mr-2 font-medium">{{ h.student.name }}</span>
+            <!-- 학생을 삭제해도 이력은 남는다 (#61) -->
+            <AppBadge
+              v-if="showStudent && h.student.deletedAt"
+              tone="canceled"
+              class="mr-2 align-middle"
+              data-testid="withdrawn"
+            >
+              탈퇴
+            </AppBadge>
             <AppBadge :tone="actionTone(h)" class="mr-2 align-middle">
               {{ actionLabel(h) }}
             </AppBadge>

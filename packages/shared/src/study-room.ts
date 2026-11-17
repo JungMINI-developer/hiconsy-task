@@ -56,11 +56,27 @@ export interface CreateStudyRoomRequest {
 
 export type UpdateStudyRoomRequest = Partial<CreateStudyRoomRequest>;
 
+/**
+ * 강사 화면의 기록(이력·신청 학생·배치도)에 붙는 학생.
+ * 학생을 삭제해도 지난 방문 기록은 남으므로(#57), 삭제된 학생이면 `deletedAt`으로 "탈퇴한 학생"을 표시한다 (#61).
+ */
+export interface StudentRef {
+  id: number;
+  name: string;
+  /** 탈퇴(삭제)한 학생이면 삭제 시각, 아니면 null */
+  deletedAt: IsoDateString | null;
+}
+
+/** 동명이인을 구분할 수 있도록 연락처를 함께 주는 학생 (강사 화면) */
+export interface StudentContact extends StudentRef {
+  phone: string;
+}
+
 /** 자습실 상세의 방문 신청·수정·취소 이력 1건 */
 export interface StudyRoomHistory {
   id: number;
   visitId: number;
-  student: { id: number; name: string };
+  student: StudentRef;
   action: VisitAction;
   prevStartAt: IsoDateString | null;
   prevEndAt: IsoDateString | null;
@@ -82,7 +98,7 @@ export interface StudyRoomHistory {
 export interface StudyRoomVisit {
   /** 방문 신청 id */
   id: number;
-  student: { id: number; name: string; phone: string };
+  student: StudentContact;
   startAt: IsoDateString;
   endAt: IsoDateString;
   seat: SeatRef | null;
@@ -99,7 +115,7 @@ export interface SeatAvailability extends SeatRef {
 export interface SeatOccupancy extends SeatRef {
   visit: {
     id: number;
-    student: { id: number; name: string; phone: string };
+    student: StudentContact;
     startAt: IsoDateString;
     endAt: IsoDateString;
   } | null;

@@ -102,6 +102,38 @@ export class Seed {
     return this.post<Visit>(`/students/${studentId}/visits/${visitId}/cancel`, {});
   }
 
+  async deleteStudent(id: number) {
+    const res = await this.api.delete(`${E2E_API_URL}/students/${id}`);
+    expect(res.ok(), await res.text()).toBeTruthy();
+  }
+
+  /**
+   * 자습실과 그 신청·이력을 hours시간 앞으로(과거로) 옮긴다.
+   * 이미 지난 방문은 API로 만들 수 없어(VISIT_IN_PAST) "시간이 흐른 상황"을 DB에서 만든다.
+   */
+  async shiftRoomBack(studyRoomId: number, hours: number) {
+    const client = new pg.Client({ connectionString: E2E_DATABASE_URL });
+    await client.connect();
+    const d = `interval '${hours} hours'`;
+    try {
+      await client.query(
+        `UPDATE study_rooms SET start_date = start_date - ${d}, end_date = end_date - ${d} WHERE id = $1`,
+        [studyRoomId],
+      );
+      await client.query(
+        `UPDATE visits SET start_at = start_at - ${d}, end_at = end_at - ${d} WHERE study_room_id = $1`,
+        [studyRoomId],
+      );
+      await client.query(
+        `UPDATE visit_histories SET start_at = start_at - ${d}, end_at = end_at - ${d},
+           prev_start_at = prev_start_at - ${d}, prev_end_at = prev_end_at - ${d} WHERE study_room_id = $1`,
+        [studyRoomId],
+      );
+    } finally {
+      await client.end();
+    }
+  }
+
   async deleteRoom(id: number) {
     const res = await this.api.delete(`${E2E_API_URL}/study-rooms/${id}`);
     expect(res.ok(), await res.text()).toBeTruthy();

@@ -19,7 +19,8 @@ const props = defineProps<{
 function seatLabel(seat: SeatOccupancy) {
   if (!seat.visit) return `${seat.number}번 좌석, 비어 있음`;
   const v = seat.visit;
-  return `${seat.number}번 좌석, ${v.student.name}, ${formatTimeRange(v.startAt, v.endAt)}`;
+  const withdrawn = v.student.deletedAt ? ', 탈퇴한 학생' : '';
+  return `${seat.number}번 좌석, ${v.student.name}${withdrawn}, ${formatTimeRange(v.startAt, v.endAt)}`;
 }
 
 function seatClass(seat: SeatOccupancy) {
@@ -72,18 +73,29 @@ function seatClass(seat: SeatOccupancy) {
             {{ seat.number }}
           </span>
           <template v-if="seat.visit">
+            <!-- 탈퇴한 학생(#61): 칸이 좁아 배지 대신 이름을 흐리게, 끝나는 시각 자리에 "탈퇴". 스크린리더·툴팁은 "탈퇴한 학생" -->
             <span
               :class="
                 cn(
                   'w-full truncate text-caption leading-tight sm:text-label',
                   seat.id === highlightedSeatId && 'font-bold',
+                  seat.visit.student.deletedAt && 'text-fg-muted',
                 )
               "
               aria-hidden="true"
             >
               {{ seat.visit.student.name }}
             </span>
+            <!-- 320px에서는 끝나는 시각을 숨기지만 "탈퇴"는 보인다 (색만으로 구분하지 않도록) -->
             <span
+              v-if="seat.visit.student.deletedAt"
+              class="text-caption leading-none text-fg-muted"
+              aria-hidden="true"
+            >
+              탈퇴
+            </span>
+            <span
+              v-else
               class="hidden text-caption leading-none text-fg-muted sm:inline"
               aria-hidden="true"
             >
