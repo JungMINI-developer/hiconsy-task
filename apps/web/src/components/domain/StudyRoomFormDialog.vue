@@ -15,6 +15,7 @@ import {
 import { errorMessage } from '@/utils/errorMessage';
 import {
   hasErrors,
+  removedSeatsText,
   ROOM_CAPACITY_MAX,
   ROOM_NAME_MAX,
   validateStudyRoomForm,
@@ -77,8 +78,6 @@ const touched = reactive<Record<keyof StudyRoomFormErrors, boolean>>({
 });
 const submitted = ref(false);
 const saving = ref(false);
-/** 현재 신청 인원 (정원 축소 409를 받으면 최신 값으로 갱신) */
-const currentPersonnel = ref(props.room?.currentPersonnel ?? 0);
 const serverFieldErrors = ref<StudyRoomFormErrors>({});
 const formError = ref<{ message: string; showApplicantsLink?: boolean } | null>(null);
 
@@ -92,7 +91,6 @@ watch(
     submitted.value = false;
     serverFieldErrors.value = {};
     formError.value = null;
-    currentPersonnel.value = props.room?.currentPersonnel ?? 0;
   },
   { immediate: true },
 );
@@ -125,9 +123,15 @@ function moveStart(next: { date?: string; time?: string }) {
   values.endTime = toTimeValue(shifted);
 }
 
-const clientErrors = computed(() =>
-  validateStudyRoomForm(values, isEdit.value ? currentPersonnel.value : 0),
-);
+const clientErrors = computed(() => validateStudyRoomForm(values));
+
+/** 최대 인원 = 좌석 수. 수정에서 줄이면 없어질 좌석을 미리 알린다 (막지는 않음, 서버가 판단) */
+const capacityHint = computed(() => {
+  const removed = props.room
+    ? removedSeatsText(props.room.maxPersonnel, values.maxPersonnel)
+    : null;
+  return removed ?? `좌석 수예요. 한 줄 5석으로 배치돼요 (1~${ROOM_CAPACITY_MAX}석)`;
+});
 
 /** blur 이후부터 보여주고, 한 번 보이면 고칠 때마다 다시 검사한다 (정원은 입력 즉시) */
 function fieldError(field: keyof StudyRoomFormErrors): string | undefined {
@@ -168,24 +172,17 @@ async function submit() {
     emit('saved', saved, isEdit.value ? 'edit' : 'create');
     open.value = false;
   } catch (e) {
-    await handleError(e);
+    handleError(e);
   } finally {
     saving.value = false;
   }
 }
 
-async function handleError(e: unknown) {
+function handleError(e: unknown) {
   const code = e instanceof AppError ? e.code : null;
-  if (code === ErrorCode.CAPACITY_BELOW_CURRENT && props.room) {
-    // 그 사이 신청이 늘었을 수 있으므로 현재 인원을 다시 가져온다
-    try {
-      currentPersonnel.value = (await studyRoomsApi.get(props.room.id)).currentPersonnel;
-    } catch {
-      /* 실패하면 기존 값으로 안내 */
-    }
-    const n = currentPersonnel.value;
+  if (code === ErrorCode.SEATS_IN_USE) {
     serverFieldErrors.value = {
-      maxPersonnel: `현재 ${n}명이 신청했어요. ${n}명 이상으로 정해 주세요`,
+      maxPersonnel: `없어질 좌석에 끝나지 않은 예약이 있어 ${values.maxPersonnel}석으로 줄일 수 없어요. 학생과 좌석을 먼저 조율해 주세요`,
     };
     focusFirstError(serverFieldErrors.value);
   } else if (code === ErrorCode.INVALID_PERIOD) {
@@ -206,16 +203,17 @@ async function handleError(e: unknown) {
   <AppDialog
     v-model:open="open"
     :title="isEdit ? '자습실 수정' : '새 자습실'"
-    :description="isEdit ? undefined : '최대 인원과 운영 기간을 정해 자습실을 열어요'"
+    :description="isEdit ? undefined : '좌석 수와 운영 기간을 정해 자습실을 열어요'"
   >
     <form class="flex flex-col gap-5" novalidate @submit.prevent="submit">
       <AppAlert v-if="formError" :message="formError.message">
         <RouterLink
           v-if="formError.showApplicantsLink && room"
-          :to="{ name: 'teacher-room', params: { id: room.id }, query: { tab: 'applicants' } }"
+          :to="{ name: 'teacher-room', params: { id: room.id } }"
           class="mt-1 inline-block text-label text-accent underline underline-offset-4"
+          @click="open = false"
         >
-          신청자 보기
+          신청 학생 보기
         </RouterLink>
       </AppAlert>
 
@@ -241,7 +239,7 @@ async function handleError(e: unknown) {
         id="room-max"
         v-slot="{ id, describedby, invalid }"
         label="최대 인원"
-        :hint="isEdit ? `현재 ${currentPersonnel}명이 신청했어요` : undefined"
+        :hint="capacityHint"
         :error="fieldError('maxPersonnel')"
       >
         <AppNumberField
@@ -249,7 +247,7 @@ async function handleError(e: unknown) {
           v-model="values.maxPersonnel"
           :min="1"
           :max="ROOM_CAPACITY_MAX"
-          unit="명"
+          unit="석"
           :invalid="invalid"
           :describedby="describedby"
         />
