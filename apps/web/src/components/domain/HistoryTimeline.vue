@@ -19,12 +19,13 @@ withDefaults(
   { showStudent: true },
 );
 
-const ACTION_LABEL = { APPLY: '신청', UPDATE: '변경', CANCEL: '취소' } as const;
+const ACTION_LABEL = { APPLY: '신청', UPDATE: '변경', CANCEL: '취소', CHECKOUT: '퇴실' } as const;
 
 /** 훑어볼 때 종류가 먼저 보이도록 배지 색을 나눈다 (글자 라벨이 있어 색만으로 구분하지 않음) */
 function actionTone(h: StudyRoomHistory): BadgeVariants['tone'] {
   if (h.action === 'APPLY') return 'applied';
   if (h.action === 'UPDATE') return 'neutral';
+  if (h.action === 'CHECKOUT') return 'ended';
   return h.actorType === 'SYSTEM' ? 'full' : 'canceled';
 }
 
@@ -36,18 +37,23 @@ function dotClass(h: StudyRoomHistory) {
   if (h.actorType === 'SYSTEM') return 'border-2 border-status-danger bg-surface';
   if (h.action === 'APPLY') return 'bg-status-applied';
   if (h.action === 'UPDATE') return 'bg-status-warn';
+  if (h.action === 'CHECKOUT') return 'bg-status-ended';
   return 'bg-status-canceled';
 }
 
 /** 방문 구간 — 운영 기간이 여러 날일 수 있으므로 날짜를 항상 붙인다 */
 const visitRange = (start: string, end: string) => formatRange(start, end);
 
-/** 변경에서 시간이 바뀌었는지 (좌석만 바꾼 변경은 시간을 보여주지 않는다) */
+/**
+ * 변경·퇴실에서 시간이 바뀌었는지 (좌석만 바꾼 변경은 시간을 보여주지 않는다).
+ * 퇴실(#66)은 종료가 앞당겨지므로 `19:00 – 21:00 → 19:00 – 19:47`로 보여준다.
+ */
 function timeChanged(h: StudyRoomHistory): h is StudyRoomHistory & {
   prevStartAt: string;
   prevEndAt: string;
 } {
-  if (h.action !== 'UPDATE' || !h.prevStartAt || !h.prevEndAt) return false;
+  if ((h.action !== 'UPDATE' && h.action !== 'CHECKOUT') || !h.prevStartAt || !h.prevEndAt)
+    return false;
   const same = (a: string, b: string) => new Date(a).getTime() === new Date(b).getTime();
   return !same(h.prevStartAt, h.startAt) || !same(h.prevEndAt, h.endAt);
 }

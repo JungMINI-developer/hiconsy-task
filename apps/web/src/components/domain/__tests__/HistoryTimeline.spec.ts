@@ -87,6 +87,29 @@ describe('HistoryTimeline', () => {
     expect(legacy.text()).toContain('18:00 – 20:00');
   });
 
+  it('퇴실은 "퇴실" 배지와 앞당긴 종료 시각을 보여준다 (#66)', () => {
+    const wrapper = mount(HistoryTimeline, {
+      props: {
+        items: [
+          {
+            ...base,
+            action: 'CHECKOUT',
+            prevStartAt: '2026-11-20T18:00:00+09:00',
+            prevEndAt: '2026-11-20T20:00:00+09:00',
+            startAt: '2026-11-20T18:00:00+09:00',
+            endAt: '2026-11-20T19:47:12+09:00',
+            seat: { id: 7, number: 7 },
+            prevSeat: { id: 7, number: 7 },
+          },
+        ],
+      },
+    });
+    expect(wrapper.text()).toContain('퇴실');
+    expect(wrapper.find('del').text()).toBe('11.20(금) 18:00 – 20:00');
+    expect(wrapper.text()).toContain('18:00 – 19:47');
+    expect(wrapper.text()).toContain('7번 좌석');
+  });
+
   it('시스템 취소는 자동 취소와 사유를 보여준다', () => {
     const wrapper = mount(HistoryTimeline, {
       props: { items: [{ ...base, action: 'CANCEL', actorType: 'SYSTEM', reason: '자습실 삭제' }] },
