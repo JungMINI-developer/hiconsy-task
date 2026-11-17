@@ -1,4 +1,4 @@
-import { enterAsStudent, expect, kst, test } from './support/fixtures';
+import { enterAsStudent, enterAsTeacher, expect, kst, test } from './support/fixtures';
 import type { Page } from '@playwright/test';
 import { expectNoHorizontalScroll, nav, pick, toast } from './support/ui';
 
@@ -92,6 +92,54 @@ test.describe('학생 · 방문 신청', () => {
     await expect(seatGroup(page).getByRole('radio', { name: '5번 좌석, 비어 있음' })).toBeChecked();
     await page.getByRole('button', { name: '신청하기' }).click();
     await expect(toast(page, /방문을 신청했어요/)).toBeVisible();
+  });
+
+  test('진행 중인 방문은 퇴실하면 지난 방문이 되고, 강사 이력에 퇴실로 남는다 (#66)', async ({
+    page,
+    seed,
+  }) => {
+    const room = await seed.room({ name: 'A 자습실', maxPersonnel: 5 });
+    const me = await seed.student('김하늘', '010-1111-1111');
+    await seed.visit(me.id, room.id, kst(1, 10), kst(1, 13), { seat: 3 });
+    // 방문이 1시간 전에 시작한 상태로 옮긴다 (진행 중인 방문은 API로 만들 수 없다)
+    const hoursBack = (Date.parse(kst(1, 10)) - (Date.now() - 60 * 60 * 1000)) / 3_600_000;
+    await seed.shiftRoomBack(room.id, hoursBack);
+    await enterAsStudent(page, me);
+
+    // 자습실 페이지: 시간·좌석 변경 대신 [퇴실]
+    await page.goto(`/student/rooms/${room.id}`);
+    await expect(page.getByRole('button', { name: '시간 변경' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '퇴실' })).toBeVisible();
+
+    // 내 신청: "방문 중" + [퇴실] → 확인 → 지난 방문
+    await nav(page)
+      .getByRole('link', { name: /내 신청/ })
+      .click();
+    const visit = page.getByRole('listitem').filter({ hasText: 'A 자습실' });
+    await expect(visit).toContainText('방문 중');
+    await visit.getByRole('button', { name: 'A 자습실 퇴실' }).click();
+    const confirm = page.getByRole('alertdialog', { name: '지금 퇴실할까요?' });
+    await expect(confirm).toContainText('A 자습실 · 3번 좌석');
+    await expect(confirm).toContainText('되돌릴 수 없어요');
+    await confirm.getByRole('button', { name: '퇴실' }).click();
+    await expect(toast(page, /퇴실했어요\. .* 이용/)).toBeVisible();
+    await expect(page.getByText('아직 신청한 방문이 없어요')).toBeVisible();
+    await page.getByRole('tab', { name: /지난 방문/ }).click();
+    await expect(page.getByRole('listitem').filter({ hasText: 'A 자습실' })).toContainText(
+      '3번 좌석',
+    );
+    await expectNoHorizontalScroll(page);
+
+    // 강사 이력: "퇴실" + 원래 시간 → 앞당긴 시간
+    await enterAsTeacher(page);
+    await page.goto(`/teacher/rooms/${room.id}?tab=histories`);
+    const checkout = page
+      .getByRole('region', { name: '이력' })
+      .getByRole('listitem')
+      .filter({ hasText: '퇴실' });
+    await expect(checkout).toHaveCount(1);
+    await expect(checkout.locator('del')).toBeVisible();
+    await expect(checkout).toContainText('3번 좌석');
   });
 
   test('좌석 변경: 시간은 그대로 두고 좌석만 바꾼다', async ({ page, seed }) => {
