@@ -22,6 +22,7 @@ export function toStudyRoom(
     currentPersonnel,
     occupiedSeats: seatStatus.occupiedSeats,
     hasFreeSlot: seatStatus.hasFreeSlot,
+    unfinishedVisits: seatStatus.unfinishedVisits,
     startDate: toKstIso(row.startDate),
     endDate: toKstIso(row.endDate),
     createdAt: toKstIso(row.createdAt),

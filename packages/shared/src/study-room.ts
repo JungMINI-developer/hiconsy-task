@@ -30,6 +30,11 @@ export interface StudyRoom {
   /** 현재 유효 신청(APPLIED) 건수. 좌석을 시간별로 나눠 쓰므로 최대 인원보다 많을 수 있다 */
   currentPersonnel: number;
   /**
+   * 끝나지 않은(진행 중 포함) 유효 신청 수 = 자습실을 삭제하면 자동 취소될 신청 수 (#57).
+   * 이미 끝난 방문은 삭제해도 그대로 남는다
+   */
+  unfinishedVisits: number;
+  /**
    * 지금 시각이 방문 구간 안에 있는 유효 신청 수 = 지금 이용 중인 좌석 수 (예약 기준, #49).
    * 운영 시간이 아니면 null
    */
