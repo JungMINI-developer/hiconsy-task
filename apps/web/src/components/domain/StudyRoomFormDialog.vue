@@ -130,7 +130,7 @@ const capacityHint = computed(() => {
   const removed = props.room
     ? removedSeatsText(props.room.maxPersonnel, values.maxPersonnel)
     : null;
-  return removed ?? `좌석 수예요. 한 줄 5석으로 배치돼요 (1~${ROOM_CAPACITY_MAX}석)`;
+  return removed ?? `좌석 수예요 (1~${ROOM_CAPACITY_MAX}석)`;
 });
 
 /** blur 이후부터 보여주고, 한 번 보이면 고칠 때마다 다시 검사한다 (정원은 입력 즉시) */
@@ -314,7 +314,13 @@ function handleError(e: unknown) {
         <AppButton variant="secondary" size="lg" class="flex-1" @click="open = false"
           >닫기</AppButton
         >
-        <AppButton type="submit" size="lg" class="flex-1" :loading="saving">저장</AppButton>
+        <!--
+          누르는 순간 입력 칸이 blur되면 그 칸의 에러가 먼저 나타나 버튼이 밀리고 클릭이 빗나간다
+          (좁은 화면에서 다이얼로그가 길 때). 포커스를 옮기지 않고 제출해 검증은 submit에서 한 번에 한다.
+        -->
+        <AppButton type="submit" size="lg" class="flex-1" :loading="saving" @mousedown.prevent
+          >저장</AppButton
+        >
       </div>
     </form>
   </AppDialog>
