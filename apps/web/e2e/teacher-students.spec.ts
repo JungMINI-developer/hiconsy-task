@@ -50,7 +50,7 @@ test('학생을 삭제하면 유효 신청 수를 알려주고 목록에서 뺀�
   await page.getByRole('menuitem', { name: '삭제' }).click();
 
   const confirm = page.getByRole('alertdialog', { name: '김하늘 학생을 삭제할까요?' });
-  await expect(confirm).toContainText('유효 신청 1건이 취소돼요');
+  await expect(confirm).toContainText('끝나지 않은 신청 1건이 취소돼요');
   await confirm.getByRole('button', { name: '삭제' }).click();
 
   await expect(toast(page, '김하늘 학생을 삭제했어요')).toBeVisible();

@@ -216,11 +216,12 @@ function onSaved() {
 const deleteOpen = ref(false);
 const removing = ref(false);
 const deleteDescription = computed(() => {
-  const n = room.value?.currentPersonnel ?? 0;
+  // 삭제하면 끝나지 않은 신청만 취소된다 — 지난 방문은 그대로 남는다 (#57)
+  const n = room.value?.unfinishedVisits ?? 0;
   const effect =
     n > 0
-      ? `신청한 학생 ${n}명의 신청이 모두 취소돼요. 학생은 내 신청에서 취소 사유를 볼 수 있어요.`
-      : '아직 신청한 학생이 없어요. 삭제하면 목록에서 사라져요.';
+      ? `끝나지 않은 신청 ${n}건이 취소돼요. 지난 방문 기록은 그대로 남고, 학생은 내 신청에서 취소 사유를 볼 수 있어요.`
+      : '취소될 신청이 없어요. 삭제하면 목록에서 사라져요.';
   return `${room.value?.name ?? ''} · ${effect}`;
 });
 async function confirmDelete() {
