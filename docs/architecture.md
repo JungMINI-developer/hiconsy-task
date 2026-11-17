@@ -39,6 +39,7 @@ src/
     interceptors/         # 반환값 → ApiSuccess 포맷
   prisma/                 # PrismaService (Global)
   study-rooms/            # 자습실 (controller, service, dto, mapper, 행 락)
+  seats/                  # 좌석: 좌석 겹침 검사, 좌석 현황·시각별 배치도·빈 좌석 조회, 좌석 생성
   students/               # 학생 (전화번호 정규화 포함)
   visits/                 # 방문 신청·수정·취소, 내 신청 목록, 시스템 자동 취소
 test/                     # e2e (테스트 전용 DB, 테스트마다 테이블 초기화)
@@ -73,37 +74,42 @@ prisma/
 
 전체 명세는 Swagger(`/api/docs`)에서 확인할 수 있다.
 
-| Method | Path                                              | 설명                                       | 주요 에러                                                                                                                         |
-| ------ | ------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/study-rooms`                                | 자습실 목록 (삭제 제외, 현재 신청 인원)    |                                                                                                                                   |
-| POST   | `/api/study-rooms`                                | 자습실 등록                                | 400 `INVALID_PERIOD`                                                                                                              |
-| GET    | `/api/study-rooms/:id`                            | 자습실 상세                                | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                        |
-| GET    | `/api/study-rooms/:id/histories`                  | 방문 신청·수정·취소 이력 (시간순)          | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                        |
-| GET    | `/api/study-rooms/:id/visits`                     | 유효 신청 (학생 연락처 포함, 방문 시작 순) | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                        |
-| PATCH  | `/api/study-rooms/:id`                            | 자습실 수정 (보낸 필드만)                  | 409 `SEATS_IN_USE`, `PERIOD_EXCLUDES_VISITS`                                                                                      |
-| DELETE | `/api/study-rooms/:id`                            | Soft Delete + 유효 신청 자동 취소 (204)    | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                        |
-| GET    | `/api/students`                                   | 학생 목록 (삭제 제외, 이름순)              |                                                                                                                                   |
-| POST   | `/api/students`                                   | 학생 등록 (전화번호 정규화)                | 409 `DUPLICATE_PHONE`                                                                                                             |
-| GET    | `/api/students/:id`                               | 학생 상세                                  | 404 `STUDENT_NOT_FOUND`                                                                                                           |
-| PATCH  | `/api/students/:id`                               | 학생 수정 (보낸 필드만)                    | 404 `STUDENT_NOT_FOUND`, 409 `DUPLICATE_PHONE`                                                                                    |
-| DELETE | `/api/students/:id`                               | Soft Delete + 유효 신청 자동 취소 (204)    | 404 `STUDENT_NOT_FOUND`                                                                                                           |
-| GET    | `/api/students/:studentId/visits`                 | 내 신청 목록 (취소 포함, 방문 시작 순)     | 404 `STUDENT_NOT_FOUND`                                                                                                           |
-| POST   | `/api/students/:studentId/visits`                 | 방문 신청 / 취소 후 재신청                 | 400 `VISIT_IN_PAST`·`VISIT_OUT_OF_PERIOD`, 404 `STUDY_ROOM_NOT_FOUND`, 409 `ALREADY_APPLIED`·`VISIT_TIME_OVERLAP`·`CAPACITY_FULL` |
-| PATCH  | `/api/students/:studentId/visits/:visitId`        | 방문 시간 수정                             | 400, 404 `VISIT_NOT_FOUND`, 409 `VISIT_TIME_OVERLAP`·`VISIT_ALREADY_CANCELED`·`VISIT_ALREADY_STARTED`                             |
-| POST   | `/api/students/:studentId/visits/:visitId/cancel` | 방문 취소 (정원 복원)                      | 404 `VISIT_NOT_FOUND`, 409 `VISIT_ALREADY_CANCELED`·`VISIT_ALREADY_STARTED`                                                       |
+- 신청·변경의 `seatId`를 보내지 않으면 서버가 그 시간 내내 비어 있는 가장 작은 번호 좌석을 배정한다(좌석 도입 전 클라이언트와의 호환용, 없으면 409 `CAPACITY_FULL`). 웹은 항상 `seatId`를 보낸다.
+
+| Method | Path                                              | 설명                                                                                 | 주요 에러                                                                                                                                       |
+| ------ | ------------------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/study-rooms`                                | 자습실 목록 (삭제 제외, 좌석 수·지금 이용 중인 좌석)                                 |                                                                                                                                                 |
+| POST   | `/api/study-rooms`                                | 자습실 등록                                                                          | 400 `INVALID_PERIOD`                                                                                                                            |
+| GET    | `/api/study-rooms/:id`                            | 자습실 상세                                                                          | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                                      |
+| GET    | `/api/study-rooms/:id/seats?startAt&endAt`        | 좌석마다 그 시간 내내 비어 있는지 (학생 좌석 고르기, `exceptVisitId`로 내 신청 제외) | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                                      |
+| GET    | `/api/study-rooms/:id/seat-map?at`                | 그 시각에 좌석마다 앉기로 한 신청·학생 연락처 (강사 배치도)                          | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                                      |
+| GET    | `/api/study-rooms/free-seats?startAt&endAt`       | 자습실별로 그 시간 내내 비어 있는 좌석 수 (빈 좌석 있는 자습실 안내)                 |                                                                                                                                                 |
+| GET    | `/api/study-rooms/:id/histories`                  | 방문 신청·수정·취소 이력 (시간순)                                                    | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                                      |
+| GET    | `/api/study-rooms/:id/visits`                     | 유효 신청 (학생 연락처 포함, 방문 시작 순)                                           | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                                      |
+| PATCH  | `/api/study-rooms/:id`                            | 자습실 수정 (보낸 필드만, 좌석 늘리기·줄이기)                                        | 409 `SEATS_IN_USE`, `PERIOD_EXCLUDES_VISITS`                                                                                                    |
+| DELETE | `/api/study-rooms/:id`                            | Soft Delete + 유효 신청 자동 취소 (204)                                              | 404 `STUDY_ROOM_NOT_FOUND`                                                                                                                      |
+| GET    | `/api/students`                                   | 학생 목록 (삭제 제외, 이름순)                                                        |                                                                                                                                                 |
+| POST   | `/api/students`                                   | 학생 등록 (전화번호 정규화)                                                          | 409 `DUPLICATE_PHONE`                                                                                                                           |
+| GET    | `/api/students/:id`                               | 학생 상세                                                                            | 404 `STUDENT_NOT_FOUND`                                                                                                                         |
+| PATCH  | `/api/students/:id`                               | 학생 수정 (보낸 필드만)                                                              | 404 `STUDENT_NOT_FOUND`, 409 `DUPLICATE_PHONE`                                                                                                  |
+| DELETE | `/api/students/:id`                               | Soft Delete + 유효 신청 자동 취소 (204)                                              | 404 `STUDENT_NOT_FOUND`                                                                                                                         |
+| GET    | `/api/students/:studentId/visits`                 | 내 신청 목록 (취소 포함, 방문 시작 순)                                               | 404 `STUDENT_NOT_FOUND`                                                                                                                         |
+| POST   | `/api/students/:studentId/visits`                 | 방문 신청 / 취소 후 재신청 (`seatId`)                                                | 400 `VISIT_IN_PAST`·`VISIT_OUT_OF_PERIOD`, 404 `STUDY_ROOM_NOT_FOUND`·`SEAT_NOT_FOUND`, 409 `ALREADY_APPLIED`·`VISIT_TIME_OVERLAP`·`SEAT_TAKEN` |
+| PATCH  | `/api/students/:studentId/visits/:visitId`        | 방문 시간·좌석 변경                                                                  | 400, 404 `VISIT_NOT_FOUND`·`SEAT_NOT_FOUND`, 409 `VISIT_TIME_OVERLAP`·`SEAT_TAKEN`·`VISIT_ALREADY_CANCELED`·`VISIT_ALREADY_STARTED`             |
+| POST   | `/api/students/:studentId/visits/:visitId/cancel` | 방문 취소 (좌석이 다시 빔, 좌석 기록은 남김)                                         | 404 `VISIT_NOT_FOUND`, 409 `VISIT_ALREADY_CANCELED`·`VISIT_ALREADY_STARTED`                                                                     |
 
 #### 동시성 제어
 
 신청 정보를 바꾸는 모든 작업은 하나의 트랜잭션에서 아래 순서로 락을 잡는다.
 
-| 작업                       | 학생 행             | 자습실 행                             |
-| -------------------------- | ------------------- | ------------------------------------- |
-| 방문 신청·재신청·시간 수정 | `FOR NO KEY UPDATE` | `FOR UPDATE`                          |
-| 방문 취소                  | `FOR SHARE`         | `FOR UPDATE`                          |
-| 자습실 수정·삭제           | -                   | `FOR UPDATE`                          |
-| 학생 삭제                  | `FOR NO KEY UPDATE` | 관련 자습실 전부 `FOR UPDATE` (id 순) |
+| 작업                            | 학생 행             | 자습실 행                             |
+| ------------------------------- | ------------------- | ------------------------------------- |
+| 방문 신청·재신청·시간·좌석 변경 | `FOR NO KEY UPDATE` | `FOR UPDATE`                          |
+| 방문 취소                       | `FOR SHARE`         | `FOR UPDATE`                          |
+| 자습실 수정·삭제                | -                   | `FOR UPDATE`                          |
+| 학생 삭제                       | `FOR NO KEY UPDATE` | 관련 자습실 전부 `FOR UPDATE` (id 순) |
 
-- **자습실 행 `FOR UPDATE`** (`lockStudyRoom()`): 같은 자습실의 작업끼리 직렬화된다. "인원 세기 → 저장" 사이에 다른 신청이 끼어들 수 없어 정원이 지켜지고, 정원 축소·기간 변경 검사와 신청이 엇갈리지 않는다. 다른 자습실 작업은 기다리지 않는다.
+- **자습실 행 `FOR UPDATE`** (`lockStudyRoom()`): 같은 자습실의 작업끼리 직렬화된다. "좌석 겹침 검사 → 저장" 사이에 다른 신청이 끼어들 수 없어 같은 좌석이 두 번 예약되지 않고, 좌석 축소·기간 변경 검사와 신청이 엇갈리지 않는다. 다른 자습실 작업은 기다리지 않는다. 좌석 단위 예약(#45)으로 바꿀 때도 락 구조는 그대로 두었다.
 - **학생 행 락** (`lockStudent()`): 어떤 모드든 학생 삭제(`FOR NO KEY UPDATE`)와 직렬화되어 "삭제된 학생의 유효 신청"가 생기지 않는다.
   - 신청·시간 수정은 `FOR NO KEY UPDATE`로 **같은 학생의 신청끼리도 직렬화**한다. A·B 자습실에 같은 시간으로 동시에 신청하면 자습실 락이 서로 달라 둘 다 "시간 겹침 검사"를 통과할 수 있기 때문이다 (requirements 9절 #13).
   - `FOR UPDATE`가 아닌 `FOR NO KEY UPDATE`인 이유: 자습실 삭제는 자습실 락을 잡은 채 `visit_histories`에 행을 넣고, 이때 FK 검사가 학생 행에 `FOR KEY SHARE`를 건다. 신청 쪽이 학생 행을 `FOR UPDATE`로 잡고 자습실 락을 기다리면 서로를 기다리는 교착 상태가 된다. `FOR NO KEY UPDATE`는 `FOR KEY SHARE`와 충돌하지 않는다.
@@ -111,7 +117,13 @@ prisma/
   - 학생 삭제는 학생 행 `FOR NO KEY UPDATE` → 신청한 자습실 행 `FOR UPDATE`(id 순)로 잡는다. 같은 신청을 자동 취소하는 자습실 삭제와 동시에 실행되면, 자습실 락 없이는 "학생 삭제는 이력 FK 검사로 자습실 락을, 자습실 삭제는 신청 행 락을" 기다리는 교착 상태가 된다. 학생 행을 `FOR UPDATE`로 잡아도 자습실 삭제의 FK 검사와 충돌해 교착 상태가 된다 (#36에서 발견, #44에서 대기열을 빼며 다시 확인).
 - 락은 항상 학생 → 자습실 순서로 잡아 교착 상태를 피한다.
 
-e2e 테스트로 검증한다 (`test/visits.e2e-spec.ts`의 "동시성").
+e2e 테스트로 검증한다 (`test/seats.e2e-spec.ts`·`test/visits.e2e-spec.ts`의 "동시성").
+
+- 같은 좌석에 10명이 동시에 같은 시간을 신청하면 1명만 성공하고 나머지는 `SEAT_TAKEN`이다. 서로 다른 좌석이면 모두 성공한다.
+- 좌석을 고르지 않고(자동 배정) 동시에 신청해도 좌석 수만큼만 성공하고 좌석이 겹치지 않는다.
+- 위 두 테스트는 신청의 자습실 락을 빼면 실패하는 것을 확인했다 (#48).
+
+아래는 좌석 전환 전(자습실 단위 정원)에 만든 테스트로, 지금은 좌석을 고르지 않는 자동 배정 경로로 같은 성질을 확인한다.
 
 - 정원 3명 자습실에 10명이 동시에 신청하면 정확히 3명만 성공한다. 자습실 락을 빼고 실행하면 10명 전원이 성공해 테스트가 실패하는 것을 확인했다.
 - 정원이 1자리 남은 자습실에 20명이 동시에 신청하면 1명만 성공한다. 남은 자리가 2·3개일 때도 그 수만큼만 성공한다(시연으로 확인). 재신청과 신규 신청이 섞여도 1건만 성공하고, 취소와 신청이 동시에 와도 어느 순서든 정원을 넘지 않는다.
@@ -123,7 +135,8 @@ e2e 테스트로 검증한다 (`test/visits.e2e-spec.ts`의 "동시성").
 
 문제별 상세(대안 비교, 락 유무 비교 결과, 재현 방법)는 솔루션 문서에 정리했다.
 
-- 정원 마감 직전(남은 자리 1~3) 동시 신청, 공정성: [solutions/study-room-capacity-concurrency.md](./solutions/study-room-capacity-concurrency.md)
+- 같은 좌석 동시 예약, 자습실 락을 그대로 쓴 이유, 좌석 축소: [solutions/seat-reservation-concurrency.md](./solutions/seat-reservation-concurrency.md)
+- 정원 마감 직전(남은 자리 1~3) 동시 신청, 공정성 (좌석 전환 전 모델의 기록): [solutions/study-room-capacity-concurrency.md](./solutions/study-room-capacity-concurrency.md)
 - 같은 학생의 시간 겹침, 학생 락 모드 선택: [solutions/visit-time-overlap-concurrency.md](./solutions/visit-time-overlap-concurrency.md)
 - 대기열(자리 제안, #44에서 제거한 기능의 기록), 학생 삭제 교착 상태 해소: [solutions/waitlist-offer.md](./solutions/waitlist-offer.md)
 
@@ -137,22 +150,24 @@ src/
   stores/               # Pinia: session(역할·선택한 학생, localStorage), myVisits(내 신청) — 헤더·학생 화면 공유
   views/
     RoleSelectView      # S-00 역할 선택 (로그인 대체)
-    teacher/            # S-10 자습실 목록 · S-11 상세(신청자·이력) · S-13 학생 목록
-    student/            # S-20 자습실 목록 · S-21 내 신청
+    teacher/            # S-10 자습실 목록 · S-11 상세(요약·신청 학생 + 시각별 좌석 배치도·이력) · S-13 학생 목록
+    student/            # S-20 자습실 목록 · S-21 내 신청 · S-22 자습실 페이지(시간 + 좌석 고르기·변경)
   components/
     ui/                 # 도메인을 모르는 공통 UI (Reka UI 래퍼: Dialog, Select, Tabs, Toast …)
-    domain/             # 자습실 카드·정원 막대·이력 타임라인, 등록/신청 다이얼로그(S-12·S-22), 정원 마감 안내(S-23)
+    domain/             # 자습실 카드, 좌석 고르기(SeatGrid)·강사 배치도(SeatMapGrid), 이력 타임라인, 등록 다이얼로그(S-12), 빈 좌석 있는 자습실 안내(S-23)
     layout/             # 헤더, 페이지 틀
   composables/          # useAsync(로딩·에러·늦은 응답 무시), useDialogQuery(다이얼로그 ↔ URL 쿼리),
-                        # useFullRoomFallback(정원 마감 시 다른 자습실 안내), useToast …
-  utils/                # 순수 함수 — 날짜 표기, 방문 시간 선택지·겹침(visitSlots), 대체 자습실 후보, 에러 문구, 검증
+                        # useVisitTimePicker·useSeatPicker(시간·좌석 고르기), useAutoRefresh(30초 갱신),
+                        # useFullRoomFallback(빈 좌석 0석일 때 다른 자습실 안내), useToast …
+  utils/                # 순수 함수 — 날짜 표기, 방문 시간 선택지·겹침(visitSlots), 배치도 볼 시각(seatMapTime),
+                        # 바뀐 것 문구(visitChange), 대체 자습실 후보, 에러 문구, 검증
   styles/main.css       # Tailwind v4 @theme 디자인 토큰
 e2e/                    # Playwright (데스크톱 1280 + 모바일 320, 전용 DB)
 ```
 
-- **서버 데이터는 전역 캐시에 두지 않습니다.** 정원은 다른 학생의 신청으로 계속 바뀌므로, 화면 진입·변경 직후·탭 복귀 시 다시 조회합니다(`useAsync` + `useRefetchOnVisible`). 예외는 여러 화면이 같이 보는 "내 신청"(`myVisits`)뿐입니다.
-- **다이얼로그 열림 상태는 URL 쿼리**(`?apply=3`, `?edit=5`, 미리 고른 시간 `&slot=`)에 둡니다. 새로고침·뒤로가기·다른 화면에서 이어서 열기가 같은 방식으로 동작합니다.
-- **규칙 판단은 서버가 최종**입니다. 화면은 운영 기간 밖·지난 시각·내 신청과 겹치는 시각을 선택지에서 미리 막고(헛걸음 방지), 서버 에러 코드(`ErrorCode`)별로 안내·재조회를 정합니다(`VisitFormDialog`의 `handleError`).
-- **비즈니스 계산은 `utils`의 순수 함수**로 빼서 단위 테스트합니다(방문 시간 선택지, 겹침, 대체 자습실 후보, 날짜 표기). 화면 흐름은 Playwright로 검증합니다.
+- **서버 데이터는 전역 캐시에 두지 않습니다.** 좌석은 다른 학생의 신청으로 계속 바뀌므로, 화면 진입·변경 직후·탭 복귀 시 다시 조회하고 좌석 화면은 30초마다 다시 받습니다(`useAsync` + `useRefetchOnVisible` + `useAutoRefresh`). 예외는 여러 화면이 같이 보는 "내 신청"(`myVisits`)뿐입니다.
+- **다이얼로그·모드 상태는 URL 쿼리**(강사 `?new=1`·`?edit=1`·`?tab=histories`, 학생 자습실 페이지의 변경 모드 `?edit=1`, 미리 고른 시간 `?slot=`)에 둡니다. 새로고침·뒤로가기·다른 화면에서 이어서 열기가 같은 방식으로 동작합니다.
+- **규칙 판단은 서버가 최종**입니다. 화면은 운영 기간 밖·지난 시각·내 신청과 겹치는 시각을 선택지에서 미리 막고(헛걸음 방지), 서버 에러 코드(`ErrorCode`)별로 안내·재조회를 정합니다(예: 좌석 선점 `SEAT_TAKEN`이면 좌석을 다시 받고 선택을 풂 — `StudentRoomView`의 `handleApplyError`).
+- **비즈니스 계산은 `utils`의 순수 함수**로 빼서 단위 테스트합니다(방문 시간 선택지, 겹침, 배치도 볼 시각, 바뀐 것 문구, 대체 자습실 후보, 날짜 표기). 화면 흐름은 Playwright로 검증합니다.
 
 UI는 Reka UI(헤드리스) + Tailwind CSS v4로 구현하고, 디자인 토큰은 `@theme`에 정의합니다. 화면 명세(S-00~S-23), 라우트 맵, 사용자 흐름, 문구 규칙은 [apps/web/docs](../apps/web/docs/README.md)를 참고합니다.
