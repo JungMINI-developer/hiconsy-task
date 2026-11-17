@@ -101,11 +101,11 @@ erDiagram
 
 ### Enum
 
-| Enum          | 값                                | 사용 컬럼                    | 의미                                                           |
-| ------------- | --------------------------------- | ---------------------------- | -------------------------------------------------------------- |
-| `VisitStatus` | `APPLIED`, `CANCELED`             | `visits.status`              | 유효 신청 / 취소. `APPLIED`만 좌석을 차지                      |
-| `VisitAction` | `APPLY`, `UPDATE`, `CANCEL`       | `visit_histories.action`     | 신청(재신청 포함) / 시간·좌석 변경 / 취소                      |
-| `ActorType`   | `STUDENT`, `INSTRUCTOR`, `SYSTEM` | `visit_histories.actor_type` | 이력을 남긴 주체. `SYSTEM`은 자습실 변경·삭제에 따른 자동 처리 |
+| Enum          | 값                                      | 사용 컬럼                    | 의미                                                           |
+| ------------- | --------------------------------------- | ---------------------------- | -------------------------------------------------------------- |
+| `VisitStatus` | `APPLIED`, `CANCELED`                   | `visits.status`              | 유효 신청 / 취소. `APPLIED`만 좌석을 차지                      |
+| `VisitAction` | `APPLY`, `UPDATE`, `CANCEL`, `CHECKOUT` | `visit_histories.action`     | 신청(재신청 포함) / 시간·좌석 변경 / 취소 / 조기 퇴실(#66)     |
+| `ActorType`   | `STUDENT`, `INSTRUCTOR`, `SYSTEM`       | `visit_histories.actor_type` | 이력을 남긴 주체. `SYSTEM`은 자습실 변경·삭제에 따른 자동 처리 |
 
 ### 상태 흐름
 
@@ -114,6 +114,7 @@ stateDiagram-v2
   direction LR
   [*] --> APPLIED : 신청 (APPLY)
   APPLIED --> APPLIED : 시간·좌석 변경 (UPDATE)
+  APPLIED --> APPLIED : 조기 퇴실 (CHECKOUT, 종료를 앞당김)
   APPLIED --> CANCELED : 취소 (CANCEL)
   CANCELED --> APPLIED : 재신청 (APPLY)
 ```
@@ -240,6 +241,7 @@ CHECK 제약은 Prisma 스키마 문법으로 표현할 수 없어 마이그레�
 ## 마이그레이션 / 시드
 
 - 마이그레이션: `apps/api/prisma/migrations/` (`pnpm db:migrate`)
+  - `20261117130000_visit_checkout`: `VisitAction`에 `CHECKOUT`을 더한다 (#66, 조기 퇴실)
   - `20261116140000_seats`: `seats` 테이블과 좌석 FK를 추가하고, 기존 데이터를 옮긴다 — 자습실마다 좌석 1~`max_personnel`번을 만들고, 유효 신청을 방문 시작 순으로 시간이 겹치지 않는 가장 작은 번호 좌석에 배정한다. 취소된 신청은 좌석 없이(NULL) 둔다.
   - `20261116100000_waitlist`에서 만든 대기열 테이블(`waitlist_entries`, `WaitlistStatus`)은 `20261116130000_drop_waitlist`에서 지웠다 (#44, 좌석 단위 예약 전환). 이미 적용된 마이그레이션은 고치지 않고 삭제 마이그레이션을 더했다.
 - 시드: `apps/api/prisma/seed.ts` (`pnpm db:seed`)
