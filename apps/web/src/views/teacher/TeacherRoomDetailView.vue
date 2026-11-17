@@ -111,7 +111,7 @@ function setTime(t: number) {
   if (v && !isSeatedAt(v, t)) highlightedVisitId.value = null;
 }
 
-// ── 요약 숫자 (#51 결정 2) ──────────────────────────────
+// ── 요약 숫자 (#51 결정 2) — 고른 시각 기준. 예약 건수는 좌석 수보다 많을 수 있어 빼고 신청 학생 수로 보여준다
 const occupiedCount = computed(() => seats.value.filter((s) => s.visit).length);
 const summary = computed(() => [
   { label: '이용 중', value: seatMap.data.value ? occupiedCount.value : null },
@@ -119,7 +119,6 @@ const summary = computed(() => [
     label: '빈 좌석',
     value: seatMap.data.value ? seats.value.length - occupiedCount.value : null,
   },
-  { label: '예약', value: room.value?.currentPersonnel ?? null },
 ]);
 
 // ── 신청 학생 · 강조 ────────────────────────────────────
@@ -300,14 +299,14 @@ async function confirmDelete() {
         aria-label="자습실 요약"
       >
         <div class="border-b border-line p-4">
-          <dl class="grid grid-cols-3 gap-2 text-center" data-testid="seat-summary">
+          <dl class="grid grid-cols-2 gap-2 text-center" data-testid="seat-summary">
             <div v-for="item in summary" :key="item.label" class="flex flex-col gap-0.5">
               <dt class="text-caption text-fg-muted">{{ item.label }}</dt>
               <dd class="text-heading tabular-nums">{{ item.value ?? '–' }}</dd>
             </div>
           </dl>
           <p v-if="viewTime !== null" class="mt-2 text-center text-caption text-fg-muted">
-            이용 중·빈 좌석은 {{ formatTime(new Date(viewTime)) }} 기준
+            {{ formatTime(new Date(viewTime)) }} 기준
           </p>
         </div>
 

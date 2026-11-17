@@ -8,11 +8,10 @@ const applicantList = (page: Page) => page.getByRole('region', { name: /신청 �
 const seat = (page: Page, n: number) =>
   page.getByRole('list', { name: '좌석 배치도' }).locator(`[data-seat="${n}"]`);
 
-async function expectSummary(page: Page, n: { occupied: number; free: number; reserved: number }) {
+async function expectSummary(page: Page, n: { occupied: number; free: number }) {
   const summary = page.getByTestId('seat-summary');
   await expect(summary.getByRole('definition').nth(0)).toHaveText(String(n.occupied));
   await expect(summary.getByRole('definition').nth(1)).toHaveText(String(n.free));
-  await expect(summary.getByRole('definition').nth(2)).toHaveText(String(n.reserved));
 }
 
 test.beforeEach(async ({ page }) => {
@@ -38,7 +37,7 @@ test.describe('강사 · 자습실 등록', () => {
     await expect(dialog).toBeHidden();
     await expect(page).toHaveURL('/teacher/rooms');
     await expect(page.getByRole('link', { name: '3층 A 자습실' })).toBeVisible();
-    await expect(page.getByText('3석 · 예약 0건')).toBeVisible();
+    await expect(page.getByText('좌석 3석')).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
 
@@ -86,7 +85,7 @@ test.describe('강사 · 자습실 수정', () => {
     await expect(dialog.getByText('5번 좌석이 없어져요')).toBeVisible();
     await dialog.getByRole('button', { name: '저장' }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByText('4석 · 예약 2건')).toBeVisible();
+    await expect(page.getByText('좌석 4석', { exact: true })).toBeVisible();
   });
 
   test('운영 기간 밖으로 밀려나는 신청이 있으면 막고 신청자를 보여준다', async ({ page, seed }) => {
@@ -124,7 +123,7 @@ test.describe('강사 · 자습실 상세 · 좌석 현황 (#51)', () => {
     await expect(time).toContainText('10:00');
     await expect(seat(page, 4)).toHaveAccessibleName('4번 좌석, 이도윤, 10:00 – 12:00');
     await expect(seat(page, 1)).toHaveAccessibleName('1번 좌석, 비어 있음');
-    await expectSummary(page, { occupied: 1, free: 9, reserved: 3 });
+    await expectSummary(page, { occupied: 1, free: 9 });
     // 운영 시간이 아니면 [지금]이 없다
     await expect(page.getByRole('button', { name: '지금' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '30분 앞으로' })).toBeDisabled();
@@ -132,7 +131,7 @@ test.describe('강사 · 자습실 상세 · 좌석 현황 (#51)', () => {
     await pick(page, time, '11:00');
     await expect(seat(page, 1)).toContainText('김하늘');
     await expect(seat(page, 4)).toContainText('이도윤');
-    await expectSummary(page, { occupied: 2, free: 8, reserved: 3 });
+    await expectSummary(page, { occupied: 2, free: 8 });
 
     // 30분씩 옮기기 — 12:00에는 이도윤이 끝났다 (끝 시각은 포함하지 않음)
     await page.getByRole('button', { name: '30분 뒤로' }).click();

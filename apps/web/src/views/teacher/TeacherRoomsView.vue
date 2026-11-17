@@ -8,6 +8,7 @@ import { useDialogQuery } from '@/composables/useDialogQuery';
 import { scrollToItem, useHighlight, useRefetchOnVisible } from '@/composables/useRefetch';
 import { useToast } from '@/composables/useToast';
 import { getRoomPhase } from '@/utils/datetime';
+import { seatUsageText } from '@/utils/roomSeats';
 import { errorMessage } from '@/utils/errorMessage';
 import PageShell from '@/components/layout/PageShell.vue';
 import RoomPhaseBadge from '@/components/domain/RoomPhaseBadge.vue';
@@ -187,9 +188,8 @@ const menuItems = [
                 @select="(key) => onMenu(room, key)"
               />
             </template>
-            <!-- 좌석을 시간별로 나눠 쓰므로 예약 건수가 좌석 수보다 많을 수 있다 (설계 결정 8) -->
             <p class="text-label tabular-nums" data-testid="room-seats">
-              {{ room.maxPersonnel }}석 · 예약 {{ room.currentPersonnel }}건
+              {{ seatUsageText(room) }}
             </p>
           </StudyRoomCard>
         </li>
