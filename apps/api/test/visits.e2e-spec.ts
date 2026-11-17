@@ -453,7 +453,7 @@ describe('Visits (e2e)', () => {
       const students = await Promise.all(Array.from({ length: 10 }, () => createStudent()));
 
       const results = await Promise.all(students.map((id) => apply(id, roomId)));
-      const statuses = results.map((res) => res.status).sort();
+      const statuses = results.map((res) => res.status);
 
       expect(statuses.filter((s) => s === 201)).toHaveLength(3);
       expect(results.filter((res) => res.status === 409).map((res) => res.body.error.code)).toEqual(
@@ -552,7 +552,7 @@ describe('Visits (e2e)', () => {
       ]);
 
       // 어느 쪽이 먼저 락을 잡든 둘 중 하나만 성공한다
-      expect([shrink.status, applyC.status].sort()).toEqual([200, 409].sort());
+      expect([shrink.status, applyC.status].sort((x, y) => x - y)).toEqual([200, 409]);
       const room = await prisma.studyRoom.findUniqueOrThrow({ where: { id: roomId } });
       const applied = await prisma.visit.count({
         where: { studyRoomId: roomId, status: 'APPLIED' },
