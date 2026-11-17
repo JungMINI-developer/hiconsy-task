@@ -399,12 +399,12 @@ describe('StudyRooms (e2e)', () => {
       const res = await api().get(`/api/study-rooms/${roomId}/visits`).expect(200);
       expect(res.body.data).toEqual([
         expect.objectContaining({
-          student: { id: b, name: '김하늘', phone: '010-5656-7878' },
+          student: { id: b, name: '김하늘', phone: '010-5656-7878', deletedAt: null },
           startAt: '2030-01-10T10:00:00.000+09:00',
           endAt: '2030-01-10T12:00:00.000+09:00',
         }),
         expect.objectContaining({
-          student: { id: a, name: '김하늘', phone: '010-1111-1111' },
+          student: { id: a, name: '김하늘', phone: '010-1111-1111', deletedAt: null },
           startAt: '2030-01-10T13:00:00.000+09:00',
         }),
       ]);
