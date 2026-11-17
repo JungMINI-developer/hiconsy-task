@@ -107,7 +107,7 @@ docker compose up --build
 | http://localhost:3000/api      | 백엔드 API         |
 | http://localhost:3000/api/docs | Swagger API 문서   |
 
-컨테이너 시작 시 DB 마이그레이션과 시드 데이터가 자동으로 적용됩니다.
+컨테이너 시작 시 DB 마이그레이션과 시드 데이터가 자동으로 적용됩니다. 시드에는 실행 시각 기준 **지금 운영 중인 자습실**(D 자습실, 이용 중 좌석 2석)이 있어 바로 좌석 현황을 볼 수 있습니다. → [시드 내용](./docs/database.md#마이그레이션--시드)
 종료: `docker compose down` (DB 데이터까지 삭제: `docker compose down -v`)
 
 ### 방법 B. 로컬 개발 모드
