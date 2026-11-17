@@ -43,6 +43,8 @@ test.describe('학생 · 방문 신청', () => {
     await expect(page.getByRole('combobox', { name: '방문 시작 시각' })).toHaveCount(0);
     await expect(seats.getByRole('radio', { name: /3번 좌석.*내 좌석/ })).toBeChecked();
     await expect(nav(page).getByRole('link', { name: /내 신청.*1/ })).toBeVisible();
+    // 내 신청 개수 배지가 붙어도 320px 헤더가 넘치지 않는다 (#63)
+    await expectNoHorizontalScroll(page);
 
     // 시간 변경 → 변경 모드: 시간과 좌석을 함께 바꿀 수 있다 (아무것도 안 바꾸면 비활성)
     await page.getByRole('button', { name: '시간 변경' }).click();

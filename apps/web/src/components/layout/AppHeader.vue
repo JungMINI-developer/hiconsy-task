@@ -3,6 +3,7 @@ import { computed, type Component } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { ArrowLeftRight, CalendarCheck, DoorOpen, Users } from 'lucide-vue-next';
 import { useSessionStore } from '@/stores/session';
+import { cn } from '@/utils/cn';
 
 interface NavItem {
   to: string;
@@ -54,7 +55,20 @@ const home = computed(() => nav.value[0]?.to ?? '/');
 <template>
   <header class="sticky top-0 z-30 border-b border-line bg-surface">
     <div class="mx-auto flex h-14 max-w-content items-center gap-2 px-4 sm:gap-6 sm:px-6">
-      <RouterLink :to="home" class="shrink-0 text-label font-semibold whitespace-nowrap">
+      <!--
+        640px 미만에서 메뉴가 있으면 로고 글자를 숨긴다 — 학생 "내 신청"에 개수 배지가 붙으면
+        320px에서 헤더가 넘쳐 '역할 바꾸기'가 잘렸다(#63). 홈 이동은 첫 메뉴("자습실")가 한다.
+        메뉴가 없는 화면(역할 선택)은 로고만 있으므로 그대로 보인다.
+      -->
+      <RouterLink
+        :to="home"
+        :class="
+          cn(
+            'shrink-0 text-label font-semibold whitespace-nowrap',
+            nav.length > 0 && 'hidden sm:inline',
+          )
+        "
+      >
         자습실 예약
       </RouterLink>
 
