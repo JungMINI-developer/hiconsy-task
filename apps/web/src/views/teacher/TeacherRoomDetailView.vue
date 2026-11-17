@@ -76,7 +76,7 @@ const studentQuery = ref('');
 const filterOptions = [
   { value: 'ALL' as const, label: '전체' },
   { value: 'APPLY' as const, label: '신청' },
-  { value: 'UPDATE' as const, label: '시간 변경' },
+  { value: 'UPDATE' as const, label: '변경' },
   { value: 'CANCEL' as const, label: '취소' },
 ];
 const visibleHistories = computed(() =>

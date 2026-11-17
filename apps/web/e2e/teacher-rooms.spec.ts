@@ -116,7 +116,7 @@ test.describe('강사 · 자습실 상세 · 삭제', () => {
     // 최신이 위
     await expect(items.first()).toContainText('이도윤');
     await expect(items.first()).toContainText('취소');
-    await expect(page.getByText('시간 변경')).toBeVisible();
+    await expect(items.filter({ hasText: '변경' })).toHaveCount(1);
 
     await pick(page, page.getByRole('combobox', { name: '이력 종류' }), '취소');
     await expect(items).toHaveCount(1);
