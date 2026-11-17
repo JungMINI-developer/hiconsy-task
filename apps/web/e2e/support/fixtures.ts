@@ -80,9 +80,20 @@ export class Seed {
     return seat.id;
   }
 
-  async changeVisit(studentId: number, visitId: number, startAt: string, endAt: string) {
+  /** 시간·좌석 변경. `seat`(좌석 번호)를 주면 좌석도 바꾼다 */
+  async changeVisit(
+    studentId: number,
+    visitId: number,
+    startAt: string,
+    endAt: string,
+    opts: { studyRoomId?: number; seat?: number } = {},
+  ) {
+    const seatId =
+      opts.seat !== undefined && opts.studyRoomId !== undefined
+        ? await this.seatId(opts.studyRoomId, opts.seat)
+        : undefined;
     const res = await this.api.patch(`${E2E_API_URL}/students/${studentId}/visits/${visitId}`, {
-      data: { startAt, endAt },
+      data: { startAt, endAt, ...(seatId !== undefined && { seatId }) },
     });
     expect(res.ok(), await res.text()).toBeTruthy();
   }
